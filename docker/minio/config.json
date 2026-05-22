@@ -1,0 +1,25 @@
+{
+  "version": "37",
+  "credential": {
+    "accessKey": "minioadmin",
+    "secretKey": "minioadmin123"
+  },
+  "region": "cn-east-1",
+  "browser": "on",
+  "logger": {
+    "console": {
+      "enable": true,
+      "level": "error"
+    },
+    "file": {
+      "enable": true,
+      "level": "error",
+      "name": "/var/log/minio/error.log"
+    }
+  },
+  "notify": {
+    "amqp": {
+      "enable": false
+    }
+  }
+}

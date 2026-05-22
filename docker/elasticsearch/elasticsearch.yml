@@ -1,0 +1,35 @@
+# ===========================================
+# Elasticsearch 生产环境配置文件
+# ===========================================
+
+cluster.name: supplier-cluster
+node.name: es-node-1
+
+path.data: /usr/share/elasticsearch/data
+path.logs: /usr/share/elasticsearch/logs
+
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9300
+
+discovery.type: single-node
+
+bootstrap.memory_lock: true
+
+xpack.security.enabled: false
+xpack.security.enrollment.enabled: false
+xpack.security.http.ssl.enabled: false
+xpack.security.transport.ssl.enabled: false
+
+indices.memory.index_buffer_size: 30%
+indices.queries.cache.size: 10%
+
+thread_pool:
+  search:
+    size: 10
+    queue_size: 1000
+  write:
+    size: 10
+    queue_size: 1000
+
+action.destructive_requires_name: true
