@@ -1,12 +1,11 @@
 import { defineStore } from 'pinia'
-import { mockApi } from '@/api/mockApi'
+import { authApi, toUserInfo } from '@/api/auth'
 import type { UserInfo } from '@/types/business'
-
-const TOKEN_KEY = 'supplier-collaboration-token'
+import { getToken, removeToken, setToken } from '@/utils/storage'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
-    token: localStorage.getItem(TOKEN_KEY) || '',
+    token: getToken(),
     user: null as UserInfo | null,
     permissions: [] as string[],
   }),
@@ -14,23 +13,25 @@ export const useUserStore = defineStore('user', {
     isLoggedIn: (state) => Boolean(state.token),
   },
   actions: {
-    async login() {
-      const result = await mockApi.login()
+    async login(username = 'admin', password = '123456') {
+      const result = await authApi.login({ username, password })
       this.token = result.token
-      this.user = result.user
-      this.permissions = result.permissions
-      localStorage.setItem(TOKEN_KEY, result.token)
+      this.user = toUserInfo(result.userInfo || result.user)
+      this.permissions = result.permissions || result.userInfo?.permissions || []
+      setToken(result.token)
     },
     async loadCurrentUser() {
-      const result = await mockApi.getCurrentUser()
-      this.user = result.user
-      this.permissions = result.permissions
+      const result = await authApi.info()
+      this.user = toUserInfo(result)
+      this.permissions = result.permissions || []
     },
     logout() {
+      // 尝试通知后端使 token 失效（fire-and-forget）
+      authApi.logout().catch(() => { /* 忽略网络异常 */ })
       this.token = ''
       this.user = null
       this.permissions = []
-      localStorage.removeItem(TOKEN_KEY)
+      removeToken()
     },
   },
 })

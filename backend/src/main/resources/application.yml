@@ -8,6 +8,10 @@ spring:
     name: supplier-collaboration
   profiles:
     active: dev
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
   servlet:
     multipart:
       max-file-size: 100MB
@@ -20,10 +24,9 @@ spring:
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
-  type-aliases-package: com.supplier.entity
+  type-aliases-package: com.supplier.**.entity
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
     db-config:
       id-type: assign_id
@@ -33,5 +36,12 @@ mybatis-plus:
 
 logging:
   level:
-    com.supplier: debug
+    com.supplier: info
     org.springframework: info
+    org.apache.ibatis: info
+
+jwt:
+  secret: supplier-collaboration-secret-key-for-jwt-token-generation-and-validation-must-be-at-least-256-bits
+  expiration: 86400000
+  header: Authorization
+  prefix: 'Bearer '

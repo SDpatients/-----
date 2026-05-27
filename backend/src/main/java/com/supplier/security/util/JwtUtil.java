@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -40,6 +41,7 @@ public class JwtUtil {
     public String generateToken(String username, Map<String, Object> claims) {
         Map<String, Object> newClaims = new HashMap<>(claims);
         newClaims.put(Claims.SUBJECT, username);
+        newClaims.put(Claims.ID, UUID.randomUUID().toString());
         newClaims.put(Claims.ISSUED_AT, new Date());
         newClaims.put(Claims.EXPIRATION, new Date(System.currentTimeMillis() + expiration));
         return Jwts.builder()
@@ -89,6 +91,11 @@ public class JwtUtil {
     public Date getExpirationDateFromToken(String token) {
         Claims claims = parseToken(token);
         return claims != null ? claims.getExpiration() : null;
+    }
+
+    public String getJtiFromToken(String token) {
+        Claims claims = parseToken(token);
+        return claims != null ? claims.getId() : null;
     }
 
     public boolean isTokenExpired(Claims claims) {

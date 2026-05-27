@@ -1,14 +1,23 @@
 <script setup lang="ts">
-defineProps<{
+import { useRouter } from 'vue-router'
+
+const props = defineProps<{
   label: string
   value: string | number
   trend: string
   tone: 'blue' | 'green' | 'orange' | 'red'
+  path?: string
 }>()
+
+const router = useRouter()
+
+const handleClick = () => {
+  if (props.path) router.push(props.path)
+}
 </script>
 
 <template>
-  <div class="metric-card" :class="`metric-card--${tone}`">
+  <div class="metric-card" :class="[`metric-card--${tone}`, { 'metric-card--clickable': path }]" @click="handleClick">
     <div class="metric-label">{{ label }}</div>
     <div class="metric-value">{{ value }}</div>
     <div class="metric-trend">{{ trend }}</div>
@@ -23,6 +32,14 @@ defineProps<{
   color: #ffffff;
   border-radius: 16px;
   box-shadow: 0 16px 36px rgba(31, 94, 255, 0.16);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.metric-card--clickable {
+  cursor: pointer;
+}
+.metric-card--clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 44px rgba(31, 94, 255, 0.24);
 }
 
 .metric-card::after {

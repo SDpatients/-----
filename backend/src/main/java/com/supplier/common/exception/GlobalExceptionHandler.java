@@ -7,6 +7,8 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -86,6 +88,20 @@ public class GlobalExceptionHandler {
     public Result<Void> handleNoHandlerFoundException(NoHandlerFoundException e) {
         log.warn("资源不存在: {}", e.getRequestURL());
         return Result.error(ResultCode.NOT_FOUND);
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public Result<Void> handleBadCredentialsException(BadCredentialsException e) {
+        log.warn("登录失败: {}", e.getMessage());
+        return Result.error(HttpStatus.UNAUTHORIZED.value(), "用户名或密码错误");
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public Result<Void> handleAuthenticationException(AuthenticationException e) {
+        log.warn("认证失败: {}", e.getMessage());
+        return Result.error(HttpStatus.UNAUTHORIZED.value(), "认证失败: " + e.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

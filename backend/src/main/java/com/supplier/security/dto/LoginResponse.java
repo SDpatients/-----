@@ -27,5 +27,9 @@ public class LoginResponse {
         private String email;
         private String phone;
         private String role;
+        private Integer userType;
+        private Long supplierId;
+        private java.util.List<String> roles;
+        private java.util.List<String> permissions;
     }
 }

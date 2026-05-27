@@ -7,7 +7,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-@MapperScan("com.supplier.mapper")
+@MapperScan("com.supplier.**.mapper")
 @EnableAsync
 @EnableScheduling
 public class SupplierCollaborationApplication {

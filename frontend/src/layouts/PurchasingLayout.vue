@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { DataBoard, Document, Goods, Money, OfficeBuilding, SetUp, Van } from '@element-plus/icons-vue'
+import { DataBoard, Document, Goods, Money, OfficeBuilding, SetUp, Van, Tools, Collection, Box, Connection } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import NotificationBell from '@/components/business/NotificationBell.vue'
+import GlobalSearch from '@/components/business/GlobalSearch.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,10 +13,15 @@ const userStore = useUserStore()
 const menus = [
   { path: '/purchasing/dashboard', title: '工作台', icon: DataBoard },
   { path: '/purchasing/suppliers', title: '供应商管理', icon: OfficeBuilding },
+  { path: '/purchasing/rfq', title: 'RFQ询价', icon: Collection },
+  { path: '/purchasing/quotes', title: '报价对比', icon: Money },
   { path: '/purchasing/orders', title: '采购订单', icon: Document },
   { path: '/purchasing/asn', title: '物流与交付', icon: Van },
+  { path: '/purchasing/vmi', title: 'VMI预测', icon: Box },
   { path: '/purchasing/quality', title: '质量协同', icon: SetUp },
-  { path: '/purchasing/settlements', title: '财务结算', icon: Money },
+  { path: '/purchasing/settlements', title: '财务结算', icon: Goods },
+  { path: '/purchasing/integration', title: '集成网关', icon: Connection },
+  { path: '/purchasing/settings', title: '系统配置', icon: Tools },
 ]
 
 const activeMenu = computed(() => route.meta.activeMenu as string || route.path)
@@ -51,7 +58,9 @@ const logout = () => {
           </el-breadcrumb>
         </div>
         <div class="header-user">
-          <el-tag type="success" effect="light">虚拟数据</el-tag>
+          <GlobalSearch />
+          <NotificationBell />
+          <el-tag type="success" effect="light">实时数据</el-tag>
           <div class="avatar" :style="{ background: userStore.user?.avatarColor || '#1f5eff' }">{{ userStore.user?.realName?.slice(0, 1) || '管' }}</div>
           <div>
             <div class="user-name">{{ userStore.user?.realName }}</div>

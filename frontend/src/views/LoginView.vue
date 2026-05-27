@@ -10,11 +10,14 @@ const loading = ref(false)
 const form = reactive({ username: 'admin', password: '123456' })
 
 const submit = async () => {
-  loading.value = true
-  await userStore.login()
-  loading.value = false
-  ElMessage.success('登录成功，当前使用虚拟数据')
-  router.replace('/purchasing/dashboard')
+  try {
+    loading.value = true
+    await userStore.login(form.username, form.password)
+    ElMessage.success('登录成功')
+    router.replace(userStore.user?.userType === 'supplier' ? '/supplier/dashboard' : '/purchasing/dashboard')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -32,18 +35,18 @@ const submit = async () => {
       </div>
     </div>
     <div class="login-card">
-      <h2>采购方后台登录</h2>
-      <p>第一、二阶段框架演示，任意输入均进入虚拟数据环境。</p>
+      <h2>协同平台登录</h2>
+      <p>使用后端真实账号登录，系统按用户类型进入对应门户。</p>
       <el-form :model="form" label-position="top" size="large" @submit.prevent>
         <el-form-item label="账号">
-          <el-input v-model="form.username" placeholder="admin" />
+          <el-input v-model="form.username" placeholder="请输入后端真实账号" />
         </el-form-item>
         <el-form-item label="密码">
           <el-input v-model="form.password" type="password" show-password placeholder="123456" />
         </el-form-item>
         <el-button type="primary" size="large" :loading="loading" class="login-button" @click="submit">进入系统</el-button>
       </el-form>
-      <div class="login-tip">虚拟账号：admin / 123456</div>
+      <div class="login-tip">请使用后端数据库中的真实用户账号</div>
     </div>
   </div>
 </template>

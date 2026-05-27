@@ -1,33 +1,45 @@
 <script setup lang="ts">
-import MetricCard from '@/components/common/MetricCard.vue'
+import { ref } from 'vue'
 import PageContainer from '@/components/common/PageContainer.vue'
+import DashboardMetricGrid from '@/components/business/DashboardMetricGrid.vue'
+import RiskWarningList from '@/components/business/RiskWarningList.vue'
+import TrendChart from '@/components/business/TrendChart.vue'
+import TodoList from '@/components/business/TodoList.vue'
+import { dashboardApi } from '@/api/dashboard'
+import { notificationApi } from '@/api/notification'
+import { useDashboardRefresh } from '@/composables/useDashboardRefresh'
+import type { DashboardMetric, RiskWarning, TrendSeries } from '@/types/dashboard'
+import type { PortalTodo } from '@/types/business'
 
-const todos = ['星河电子资质审核待补充资料', 'PO-202605-0002 订单变更待确认', 'ASN-202605-0003 收货差异待处理', 'NCR-202605-0002 需要质量复核']
-const risks = ['北辰包装绩效分低于 70，建议冻结新订单', '本周 2 单交付存在延期风险', '5 月对账差异金额 4060 元待确认']
+const metrics = ref<DashboardMetric[]>([])
+const risks = ref<RiskWarning[]>([])
+const trends = ref<TrendSeries[]>([])
+const todos = ref<PortalTodo[]>([])
+
+const loadDashboard = async () => {
+  const [metricData, riskData, trendData, todoData] = await Promise.all([dashboardApi.metrics(), dashboardApi.risks(), dashboardApi.trends(), notificationApi.todos()])
+  metrics.value = metricData
+  risks.value = riskData
+  trends.value = trendData
+  todos.value = todoData
+}
+
+const { lastRefreshAt } = useDashboardRefresh(loadDashboard, 60)
 </script>
 
 <template>
   <div class="dashboard">
-    <div class="metrics">
-      <MetricCard label="合作供应商" value="128" trend="本月新增 6 家" tone="blue" />
-      <MetricCard label="待确认订单" value="24" trend="较昨日减少 8 单" tone="green" />
-      <MetricCard label="交付预警" value="7" trend="2 单高风险" tone="orange" />
-      <MetricCard label="质量异常" value="5" trend="3 单处理中" tone="red" />
-    </div>
+    <DashboardMetricGrid :metrics="metrics" />
     <div class="dashboard-grid">
-      <PageContainer title="待办中心" subtitle="聚合采购方内部待处理事项">
-        <el-timeline>
-          <el-timeline-item v-for="item in todos" :key="item" type="primary" timestamp="今天">{{ item }}</el-timeline-item>
-        </el-timeline>
+      <PageContainer title="待办中心" :subtitle="`聚合采购方内部待处理事项，最后刷新：${lastRefreshAt}`">
+        <TodoList :todos="todos" />
       </PageContainer>
-      <PageContainer title="风险预警" subtitle="基于虚拟数据展示业务风险">
-        <div v-for="item in risks" :key="item" class="risk-item">{{ item }}</div>
+      <PageContainer title="风险预警" subtitle="基于真实交付、质量、对账数据驱动的业务风险">
+        <RiskWarningList :risks="risks" />
       </PageContainer>
     </div>
     <PageContainer title="采购协同趋势" subtitle="订单、发货、检验、对账的阶段性趋势占位">
-      <div class="trend-panel">
-        <div v-for="height in [58, 72, 46, 88, 64, 92, 76, 104, 86, 110, 98, 120]" :key="height" class="trend-bar" :style="{ height: `${height}px` }" />
-      </div>
+      <TrendChart :data="trends" />
     </PageContainer>
   </div>
 </template>
@@ -38,40 +50,10 @@ const risks = ['北辰包装绩效分低于 70，建议冻结新订单', '本周
   gap: 18px;
 }
 
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
-}
-
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   gap: 18px;
 }
 
-.risk-item {
-  padding: 14px;
-  margin-bottom: 12px;
-  color: #92400e;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  border-radius: 12px;
-}
-
-.trend-panel {
-  display: flex;
-  gap: 16px;
-  align-items: flex-end;
-  height: 180px;
-  padding: 20px;
-  background: linear-gradient(180deg, #f8fbff, #edf4fb);
-  border-radius: 14px;
-}
-
-.trend-bar {
-  flex: 1;
-  background: linear-gradient(180deg, #1f5eff, #0bb783);
-  border-radius: 10px 10px 2px 2px;
-}
 </style>

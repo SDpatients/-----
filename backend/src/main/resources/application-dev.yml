@@ -6,7 +6,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/supplier_collaboration?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
-    password: root123456
+    password: 123456
     hikari:
       minimum-idle: 5
       maximum-pool-size: 20
@@ -14,13 +14,15 @@ spring:
       max-lifetime: 1800000
       connection-timeout: 30000
       pool-name: SupplierHikariCP
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
 
   data:
     mongodb:
       uri: mongodb://localhost:27017/supplier_collaboration
       auto-index-creation: true
-
-  data:
     redis:
       host: localhost
       port: 6379
@@ -52,5 +54,4 @@ spring:
 
 logging:
   level:
-    com.supplier: debug
-    org.springframework.data.mongodb: debug
+    com.supplier: info

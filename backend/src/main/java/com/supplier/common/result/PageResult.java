@@ -14,24 +14,24 @@ public class PageResult<T> implements Serializable {
 
     private List<T> records;
     private Long total;
-    private Long size;
-    private Long current;
+    private Long pageSize;
+    private Long pageNum;
     private Long pages;
 
     public PageResult() {
         this.records = Collections.emptyList();
         this.total = 0L;
-        this.size = 10L;
-        this.current = 1L;
+        this.pageSize = 10L;
+        this.pageNum = 1L;
         this.pages = 0L;
     }
 
-    public PageResult(List<T> records, Long total, Long size, Long current) {
+    public PageResult(List<T> records, Long total, Long pageSize, Long pageNum) {
         this.records = records;
         this.total = total;
-        this.size = size;
-        this.current = current;
-        this.pages = (total + size - 1) / size;
+        this.pageSize = pageSize;
+        this.pageNum = pageNum;
+        this.pages = pageSize == 0 ? 0 : (total + pageSize - 1) / pageSize;
     }
 
     public static <T> PageResult<T> of(List<T> records, Long total, Long size, Long current) {

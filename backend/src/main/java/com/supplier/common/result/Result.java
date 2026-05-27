@@ -3,6 +3,8 @@ package com.supplier.common.result;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Data
 public class Result<T> implements Serializable {
@@ -12,6 +14,8 @@ public class Result<T> implements Serializable {
     private Integer code;
     private String message;
     private T data;
+    private LocalDateTime timestamp;
+    private String traceId;
 
     public Result() {
     }
@@ -20,6 +24,8 @@ public class Result<T> implements Serializable {
         this.code = code;
         this.message = message;
         this.data = data;
+        this.timestamp = LocalDateTime.now();
+        this.traceId = UUID.randomUUID().toString().replace("-", "");
     }
 
     public static <T> Result<T> success() {

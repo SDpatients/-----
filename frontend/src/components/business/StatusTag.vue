@@ -3,13 +3,15 @@ import { computed } from 'vue'
 import { riskMap, statusMap } from '@/constants/status'
 
 const props = defineProps<{
-  value?: string
+  value?: string | number
+  prefix?: string
   kind?: 'status' | 'risk'
 }>()
 
 const config = computed(() => {
   const map = props.kind === 'risk' ? riskMap : statusMap
-  return map[props.value || ''] || { label: props.value || '-', type: 'info' }
+  const key = props.prefix ? `${props.prefix}${props.value}` : String(props.value ?? '')
+  return map[key] || { label: key || '-', type: 'info' }
 })
 </script>
 
