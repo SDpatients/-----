@@ -4,9 +4,15 @@ import com.supplier.common.result.PageResult;
 import com.supplier.common.result.Result;
 import com.supplier.sourcing.dto.PricingDTO;
 import com.supplier.sourcing.dto.RfqCreateDTO;
+import com.supplier.sourcing.dto.RfqInviteDTO;
+import com.supplier.sourcing.dto.RfqItemUpdateDTO;
 import com.supplier.sourcing.dto.RfqUpdateDTO;
 import com.supplier.sourcing.query.RfqQuery;
+import com.supplier.sourcing.service.RfqItemService;
 import com.supplier.sourcing.service.RfqService;
+import com.supplier.sourcing.service.RfqSupplierService;
+import com.supplier.sourcing.vo.RfqItemVO;
+import com.supplier.sourcing.vo.RfqSupplierVO;
 import com.supplier.sourcing.vo.RfqVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +29,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @Validated
 @Tag(name = "询价管理", description = "询价单管理")
 @RestController
@@ -31,6 +39,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class RfqController {
 
     private final RfqService rfqService;
+    private final RfqItemService rfqItemService;
+    private final RfqSupplierService rfqSupplierService;
 
     @Operation(summary = "分页查询询价单")
     @GetMapping
@@ -93,5 +103,37 @@ public class RfqController {
                               @Valid @RequestBody PricingDTO dto) {
         rfqService.price(id, dto);
         return Result.success();
+    }
+
+    @Operation(summary = "查询询价单物料行")
+    @GetMapping("/{id}/lines")
+    @PreAuthorize("isAuthenticated()")
+    public Result<List<RfqItemVO>> lines(@PathVariable @NotNull(message = "询价单ID不能为空") Long id) {
+        return Result.success(rfqItemService.getByRfqId(id));
+    }
+
+    @Operation(summary = "保存询价单物料行")
+    @PutMapping("/{id}/lines")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Void> saveLines(@PathVariable @NotNull(message = "询价单ID不能为空") Long id,
+                                  @Valid @RequestBody List<RfqItemUpdateDTO> lines) {
+        rfqItemService.saveLines(id, lines);
+        return Result.success();
+    }
+
+    @Operation(summary = "邀请供应商")
+    @PostMapping("/{id}/invite")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Void> invite(@PathVariable @NotNull(message = "询价单ID不能为空") Long id,
+                               @Valid @RequestBody RfqInviteDTO dto) {
+        rfqSupplierService.inviteSuppliers(id, dto.getSupplierIds());
+        return Result.success();
+    }
+
+    @Operation(summary = "查询已邀请供应商列表")
+    @GetMapping("/{id}/invited")
+    @PreAuthorize("isAuthenticated()")
+    public Result<List<RfqSupplierVO>> invited(@PathVariable @NotNull(message = "询价单ID不能为空") Long id) {
+        return Result.success(rfqSupplierService.getInvitedByRfqId(id));
     }
 }

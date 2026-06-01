@@ -44,7 +44,14 @@ export const dashboardApi = {
   },
   trends: async (): Promise<TrendSeries[]> => {
     const result = await request.get<BackendTrendItem[], BackendTrendItem[]>('/v1/dashboard/trends')
-    return asArray<BackendTrendItem>(result).map((item) => ({ label: item.period, value: Math.max(item.orderCount, item.deliveryCount, item.qualityIssueCount, item.reconciliationCount) }))
+    return asArray<BackendTrendItem>(result).map((item) => ({
+      label: item.period,
+      value: item.orderCount || 0,
+      orderCount: item.orderCount,
+      deliveryCount: item.deliveryCount,
+      qualityIssueCount: item.qualityIssueCount,
+      reconciliationCount: item.reconciliationCount,
+    }))
   },
   risks: async (): Promise<RiskWarning[]> => {
     const result = await request.get<BackendRiskItem[], BackendRiskItem[]>('/v1/dashboard/risks')
@@ -66,13 +73,28 @@ export const dashboardApi = {
     const result = await request.get<BackendSupplierPerformance[], BackendSupplierPerformance[]>('/v1/dashboard/supplier-performance')
     const list = asArray<BackendSupplierPerformance>(result)
     if (list.length === 0) return []
-    const p = list[0]
-    const toPercent = (v: number | undefined | null) => (v != null && !isNaN(v) ? `${Number(v)}%` : '-')
+    const totals = list.reduce(
+      (acc, cur) => ({
+        deliveryRate: acc.deliveryRate + (cur.deliveryRate || 0),
+        qualityRate: acc.qualityRate + (cur.qualityRate || 0),
+        responseRate: acc.responseRate + (cur.responseRate || 0),
+        score: acc.score + (cur.score || 0),
+      }),
+      { deliveryRate: 0, qualityRate: 0, responseRate: 0, score: 0 },
+    )
+    const n = list.length
+    const avg = {
+      deliveryRate: totals.deliveryRate / n,
+      qualityRate: totals.qualityRate / n,
+      responseRate: totals.responseRate / n,
+      score: totals.score / n,
+    }
+    const toPercent = (v: number) => (v != null && !isNaN(v) ? `${v.toFixed(1)}%` : '-')
     return [
-      { label: '准时交货率', value: toPercent(p.deliveryRate), color: '#0bb783' },
-      { label: '质量合格率', value: toPercent(p.qualityRate), color: '#4a90d9' },
-      { label: '响应及时率', value: toPercent(p.responseRate), color: '#f5a623' },
-      { label: '综合评分', value: p.score != null && !isNaN(p.score) ? `${p.score}分` : '-', color: '#d0021b' },
+      { label: '准时交货率', value: toPercent(avg.deliveryRate), color: '#0bb783' },
+      { label: '质量合格率', value: toPercent(avg.qualityRate), color: '#4a90d9' },
+      { label: '响应及时率', value: toPercent(avg.responseRate), color: '#f5a623' },
+      { label: '综合评分', value: !isNaN(avg.score) ? `${avg.score.toFixed(1)}分` : '-', color: '#d0021b' },
     ]
   },
 }

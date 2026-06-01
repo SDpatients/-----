@@ -5,7 +5,7 @@ import com.supplier.common.entity.BaseEntity;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -17,8 +17,8 @@ public class SupplierQualification extends BaseEntity {
     private String qualName;
     private String qualNo;
     private String qualOrg;
-    private LocalDateTime validStart;
-    private LocalDateTime validEnd;
+    private LocalDate validStart;
+    private LocalDate validEnd;
     private Long fileId;
     private Integer status;
     private Integer remindDays;

@@ -19,6 +19,8 @@ public class ReceiptCreateDTO {
     private BigDecimal planQty = BigDecimal.ZERO;
     private BigDecimal receiptQty = BigDecimal.ZERO;
     private BigDecimal rejectQty = BigDecimal.ZERO;
+
+    @NotNull(message = "收货时间不能为空")
     private LocalDateTime receiptTime;
     private Long warehouseId;
     private String warehouseName;

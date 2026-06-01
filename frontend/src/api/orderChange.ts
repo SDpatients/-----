@@ -1,11 +1,16 @@
 import { request, type ApiPage } from '@/utils/request'
 import { asPage } from '@/utils/apiNormalize'
-import type { PageQuery } from '@/types/business'
+
+export interface OrderChangeQuery {
+  pageNum: number
+  pageSize: number
+  orderId?: number | null
+}
 
 export interface OrderChangeItem {
-  id: number | string
-  orderId: number | string
-  orderDetailId?: number | string
+  id: number
+  orderId: number
+  orderDetailId?: number
   changeType: number
   changeContent: string
   beforeValue?: string
@@ -17,12 +22,27 @@ export interface OrderChangeItem {
   approveTime?: string
 }
 
+export interface OrderChangeCreateDTO {
+  orderId: number
+  orderDetailId?: number
+  changeType: number
+  changeContent: string
+  beforeValue?: string
+  afterValue?: string
+  changeReason: string
+}
+
+export interface OrderChangeApproveDTO {
+  approveStatus: number
+  approveRemark?: string
+}
+
 export const orderChangeApi = {
-  page: async (params: PageQuery & { orderId?: number | string }) =>
+  page: async (params: OrderChangeQuery) =>
     asPage<OrderChangeItem>(await request.get<ApiPage<OrderChangeItem>, ApiPage<OrderChangeItem>>('/v1/order-changes', { params }), params.pageNum, params.pageSize),
   detail: (id: number | string) => request.get<OrderChangeItem, OrderChangeItem>(`/v1/order-changes/${id}`),
-  create: (data: { orderId: number | string; orderDetailId?: number | string; changeType: number; changeContent: string; beforeValue?: string; afterValue?: string; changeReason: string }) =>
+  create: (data: OrderChangeCreateDTO) =>
     request.post<number, number>('/v1/order-changes', data),
-  approve: (id: number | string, data: { approveStatus: number; approveRemark?: string }) =>
+  approve: (id: number | string, data: OrderChangeApproveDTO) =>
     request.post<void, void>(`/v1/order-changes/${id}/approve`, data),
 }

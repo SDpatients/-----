@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { orderChangeApi, type OrderChangeItem } from '@/api/orderChange'
+import { orderChangeApi, type OrderChangeItem, type OrderChangeQuery } from '@/api/orderChange'
 import { orderApi } from '@/api/order'
 import { toOrder } from '@/api/adapters'
 import PageContainer from '@/components/common/PageContainer.vue'
@@ -21,7 +21,7 @@ watch(activeTab, () => {
 const loading = ref(false)
 const records = ref<OrderChangeItem[]>([])
 const total = ref(0)
-const query = reactive<{ pageNum: number; pageSize: number; keyword: string; orderId: number | null }>({ pageNum: 1, pageSize: 10, keyword: '', orderId: null })
+const query = reactive<OrderChangeQuery & { orderId: number | null }>({ pageNum: 1, pageSize: 10, orderId: null })
 
 const changeTypeMap: Record<number, string> = { 1: '数量变更', 2: '价格变更', 3: '交期变更', 4: '其他' }
 const approveStatusMap: Record<number, string> = { 0: '待审批', 1: '已通过', 2: '已驳回' }
@@ -29,10 +29,9 @@ const approveStatusMap: Record<number, string> = { 0: '待审批', 1: '已通过
 const loadChanges = async () => {
   loading.value = true
   try {
-    const params: Record<string, unknown> = { pageNum: query.pageNum, pageSize: query.pageSize }
-    if (query.keyword) params.keyword = query.keyword
+    const params: OrderChangeQuery = { pageNum: query.pageNum, pageSize: query.pageSize }
     if (query.orderId) params.orderId = query.orderId
-    const result = await orderChangeApi.page(params as any)
+    const result = await orderChangeApi.page(params)
     records.value = result.records
     total.value = result.total
     if (result.total === 0) query.pageNum = 1
@@ -40,7 +39,6 @@ const loadChanges = async () => {
 }
 
 const resetQuery = () => {
-  query.keyword = ''
   query.orderId = undefined
   loadChanges()
 }
@@ -72,7 +70,7 @@ const showCreateDialog = ref(false)
 const selectedOrder = ref<PurchaseOrder | null>(null)
 const createForm = reactive({
   orderId: null as number | null,
-  orderDetailId: undefined as number | string | undefined,
+  orderDetailId: undefined as number | undefined,
   changeType: 1,
   changeContent: '',
   beforeValue: '',
@@ -103,7 +101,7 @@ const submitCreate = async () => {
   if (!createForm.changeReason) { ElMessage.warning('请填写变更原因'); return }
   try {
     await orderChangeApi.create({
-      orderId: createForm.orderId,
+      orderId: createForm.orderId!,
       orderDetailId: createForm.orderDetailId || undefined,
       changeType: createForm.changeType,
       changeContent: createForm.changeContent,
@@ -142,9 +140,6 @@ onMounted(loadChanges)
         <div v-if="activeTab === 'list'">
           <div class="search-panel">
             <el-form inline :model="query" @submit.prevent="loadChanges">
-              <el-form-item label="关键词">
-                <el-input v-model="query.keyword" placeholder="变更内容/原因" clearable @clear="loadChanges" @keyup.enter="loadChanges" />
-              </el-form-item>
               <el-form-item label="关联订单">
                 <OrderSelector v-model="query.orderId" style="width: 260px" @select="(o: PurchaseOrder) => query.orderId = Number(o.id)" />
               </el-form-item>

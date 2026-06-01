@@ -62,7 +62,11 @@ export const notificationApi = {
     ])
     return { messageCount, todoCount }
   },
+  messageDetail: (id: number | string) => request.get<BackendMessageNotice, BackendMessageNotice>(`/v1/messages/${id}`),
   send: (data: { receiverUserId?: number | null; receiverSupplierId?: number | null; channel: number; title: string; content: string; businessType: string; businessId: number }) => request.post<number, number>('/v1/messages', data),
   markRead: (id: number | string) => request.post<void, void>(`/v1/messages/${id}/read`),
   markAllRead: () => request.post<void, void>('/v1/messages/read-all'),
+  finishTodo: (id: number | string) => request.post<void, void>(`/v1/todos/${id}/finish`),
+  ignoreTodo: (id: number | string) => request.post<void, void>(`/v1/todos/${id}/ignore`),
+  createTodo: (data: Record<string, unknown>) => request.post<number, number>('/v1/todos', data),
 }

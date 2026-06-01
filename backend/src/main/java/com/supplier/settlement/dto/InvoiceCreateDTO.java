@@ -27,7 +27,11 @@ public class InvoiceCreateDTO {
     private BigDecimal invoiceAmount;
 
     private BigDecimal taxAmount;
+
+    @NotNull(message = "税率不能为空")
     private BigDecimal taxRate;
+
+    @NotNull(message = "开票日期不能为空")
     private LocalDate invoiceDate;
     private String remark;
 }

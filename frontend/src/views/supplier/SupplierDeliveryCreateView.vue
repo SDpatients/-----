@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref, computed } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { logisticsApi } from '@/api/logistics'
@@ -14,6 +15,11 @@ import dayjs from 'dayjs'
 
 const router = useRouter()
 const loading = ref(false)
+const formRef = ref<FormInstance>()
+const formRules = reactive<FormRules>({
+  orderId: [{ required: true, message: '请选择关联订单', trigger: 'change' }],
+  planDeliveryDate: [{ required: true, message: '计划送货日期不能为空', trigger: 'change' }],
+})
 const selectedOrder = ref<PurchaseOrder | null>(null)
 const orderLineOptions = ref<OrderLineOption[]>([])
 
@@ -65,10 +71,8 @@ const onOrderSelect = async (order: PurchaseOrder) => {
 const totalShipQty = computed(() => deliveryLines.value.reduce((s, l) => s + l.shipQty, 0))
 
 const submit = async () => {
-  if (!form.orderId) {
-    ElMessage.warning('请先搜索并选择关联的采购订单')
-    return
-  }
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) return
   // 校验可发数量
   const validLines = deliveryLines.value.filter(l => l.orderLineNo > 0 && l.shipQty > 0)
   for (const line of validLines) {
@@ -103,8 +107,8 @@ const submit = async () => {
       </template>
     </el-alert>
 
-    <el-form :model="form" label-width="120px" style="max-width: 760px">
-      <el-form-item label="关联订单" required>
+    <el-form ref="formRef" :model="form" :rules="formRules" label-width="120px" style="max-width: 760px">
+      <el-form-item label="关联订单" prop="orderId">
         <OrderSelector v-model="form.orderId" @select="onOrderSelect" />
       </el-form-item>
 
@@ -141,7 +145,7 @@ const submit = async () => {
 
       <el-row :gutter="16">
         <el-col :span="12">
-          <el-form-item label="计划送货日期" required>
+          <el-form-item label="计划送货日期" prop="planDeliveryDate">
             <el-date-picker v-model="form.planDeliveryDate" value-format="YYYY-MM-DD" style="width:100%" />
           </el-form-item>
         </el-col>

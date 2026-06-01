@@ -72,13 +72,13 @@ const loadQuotes = async () => {
 }
 
 const statusLabel = computed(() => {
-  const map: Record<number, string> = { 0: '草稿', 1: '已发布', 2: '报价中', 3: '已截止', 4: '已取消' }
+  const map: Record<number, string> = { 0: '草稿', 1: '已发布', 2: '报价中', 3: '已截止', 4: '已定价', 5: '已取消' }
   return detail.value ? map[detail.value.rfqStatus] ?? '未知' : '-'
 })
 
 const canPublish = computed(() => detail.value?.rfqStatus === 0)
 const canClose = computed(() => detail.value?.rfqStatus === 1 || detail.value?.rfqStatus === 2)
-const canCancel = computed(() => detail.value?.rfqStatus !== 4)
+const canCancel = computed(() => detail.value?.rfqStatus === 1 || detail.value?.rfqStatus === 2)
 
 const handlePublish = async () => {
   try {

@@ -46,8 +46,8 @@ const loadMessages = async () => {
   loading.value = true
   try {
     const params: Record<string, unknown> = { pageNum: pageNum.value, pageSize: pageSize.value }
-    if (filterRead.value === 'unread') params.read = true
-    else if (filterRead.value === 'read') params.read = false
+    if (filterRead.value === 'unread') params.readStatus = 0
+    else if (filterRead.value === 'read') params.readStatus = 1
     if (filterCategory.value) params.businessType = filterCategory.value
     const result = await notificationApi.messages(params)
     allMessages.value = result.records
@@ -149,7 +149,7 @@ onMounted(loadData)
   <PageContainer title="消息待办中心" subtitle="统一展示系统消息、业务待办、超期预警与处理入口">
     <el-row :gutter="18">
       <el-col :span="15">
-        <TodoList :todos="todos" />
+        <TodoList :todos="todos" @refresh="loadData" />
       </el-col>
       <el-col :span="9">
         <div class="msg-toolbar">

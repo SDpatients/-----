@@ -6,7 +6,7 @@ export interface ApiResult<T> {
   code: number
   message: string
   data: T
-  timestamp?: number
+  timestamp?: string
   traceId?: string
 }
 
@@ -38,83 +38,83 @@ const service = axios.create({
   timeout: 20000,
   transformResponse: [
     (data) => {
-      // 解决大整数精度丢失问题：将 JSON 中的大整数转换为字符串
       if (typeof data === 'string') {
-        // 使用一个更健壮的方法：逐字符解析方法
-        // 避免使用简单的正则表达式
-        let inString = false
-        let escaped = false
-        let result = ''
-        let currentNumber = ''
-        let inNumber = false
-        
-        for (let i = 0; i < data.length; i++) {
-          const char = data[i]
-          
-          if (escaped) {
-            result += char
-            escaped = false
-            continue
-          }
-          
-          if (char === '\\') {
-            result += char
-            escaped = true
-            continue
-          }
-          
-          if (char === '"') {
-            if (inNumber) {
-              // 结束数字
-              if (currentNumber.length >= 16) {
-                // 是大整数，用引号包裹
-                result += '"' + currentNumber + '"'
-              } else {
-                result += currentNumber
-              }
-              inNumber = false
-              currentNumber = ''
+        try {
+          let inString = false
+          let escaped = false
+          let result = ''
+          let currentNumber = ''
+          let inNumber = false
+
+          for (let i = 0; i < data.length; i++) {
+            const char = data[i]
+
+            if (escaped) {
+              result += char
+              escaped = false
+              continue
             }
-            inString = !inString
-            result += char
-            continue
-          }
-          
-          if (inString) {
-            result += char
-            continue
-          }
-          
-          // 不在字符串中，检查是否是数字
-          if (/[0-9]/.test(char)) {
-            inNumber = true
-            currentNumber += char
-          } else {
-            if (inNumber) {
-              // 结束数字
-              if (currentNumber.length >= 16) {
-                // 是大整数，用引号包裹
-                result += '"' + currentNumber + '"'
-              } else {
-                result += currentNumber
-              }
-              inNumber = false
-              currentNumber = ''
+
+            if (char === '\\') {
+              result += char
+              escaped = true
+              continue
             }
-            result += char
+
+            if (char === '"') {
+              if (inNumber) {
+                if (currentNumber.length >= 16) {
+                  result += '"' + currentNumber + '"'
+                } else {
+                  result += currentNumber
+                }
+                inNumber = false
+                currentNumber = ''
+              }
+              inString = !inString
+              result += char
+              continue
+            }
+
+            if (inString) {
+              result += char
+              continue
+            }
+
+            if (/[0-9]/.test(char)) {
+              inNumber = true
+              currentNumber += char
+            } else {
+              if (inNumber) {
+                if (currentNumber.length >= 16) {
+                  result += '"' + currentNumber + '"'
+                } else {
+                  result += currentNumber
+                }
+                inNumber = false
+                currentNumber = ''
+              }
+              result += char
+            }
+          }
+
+          if (inNumber) {
+            if (currentNumber.length >= 16) {
+              result += '"' + currentNumber + '"'
+            } else {
+              result += currentNumber
+            }
+          }
+
+          return JSON.parse(result)
+        } catch {
+          console.debug('[API] transformResponse 解析失败，使用原始数据')
+          try {
+            return JSON.parse(data)
+          } catch {
+            return data
           }
         }
-        
-        // 处理最后可能剩余的数字
-        if (inNumber) {
-          if (currentNumber.length >= 16) {
-            result += '"' + currentNumber + '"'
-          } else {
-            result += currentNumber
-          }
-        }
-        
-        return JSON.parse(result)
       }
       return data
     },
@@ -149,6 +149,9 @@ export const downloadBlob = async (config: AxiosRequestConfig, fileName = 'downl
 service.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = getToken()
   if (token) config.headers.Authorization = `Bearer ${token}`
+  if (config.data && typeof config.data === 'object' && !(config.data instanceof FormData) && !config.headers?.['Content-Type']) {
+    config.headers['Content-Type'] = 'application/json'
+  }
   console.debug(`[API] → ${config.method?.toUpperCase()} ${config.url}`, config.params || config.data)
   return config
 })
@@ -162,13 +165,41 @@ const handleApiError = (error: ApiError) => {
   console.debug(`[API] ✗ 错误处理 code=${error.code} status=${error.status} message="${error.message}"`)
   if ([401, 40101, 40102].includes(error.code) || error.status === 401) {
     console.debug('[API] !! 401 未授权 → 跳转登录页')
-    ElMessage.error('登录已失效，请重新登录')
+    ElMessage.error(error.code === 40102 ? '登录令牌已过期，请重新登录' : '登录已失效，请重新登录')
     redirectLogin()
     return
   }
   if ([403, 40301, 40302].includes(error.code) || error.status === 403) {
     console.debug('[API] !! 403 无权限')
-    ElMessage.error(error.message || '无权限访问')
+    ElMessage.error(error.code === 40302 ? '无权访问该数据' : error.message || '无权限访问')
+    return
+  }
+  if (error.code === 40001) {
+    ElMessage.error(error.message || '请求参数错误，请检查输入')
+    return
+  }
+  if (error.code === 40002) {
+    ElMessage.error(error.message || '资源不存在，可能已被删除')
+    return
+  }
+  if (error.code === 40900) {
+    ElMessage.error(error.message || '业务处理异常')
+    return
+  }
+  if (error.code === 40901) {
+    ElMessage.error(error.message || '当前状态不允许此操作')
+    return
+  }
+  if (error.code === 40902) {
+    ElMessage.warning('请勿重复提交')
+    return
+  }
+  if (error.code === 50001) {
+    ElMessage.error('系统异常，请联系管理员')
+    return
+  }
+  if (error.code === 50002) {
+    ElMessage.error('外部系统异常，请稍后重试')
     return
   }
   const isMockEnabled = import.meta.env.VITE_USE_MOCK === 'true'

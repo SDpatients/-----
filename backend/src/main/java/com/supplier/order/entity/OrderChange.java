@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 @TableName("order_change")
 public class OrderChange extends BaseEntity {
 
+    private String changeNo;
     private Long orderId;
     private Long orderDetailId;
     private Integer changeType;

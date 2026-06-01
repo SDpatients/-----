@@ -9,6 +9,10 @@ export interface DashboardMetric {
 export interface TrendSeries {
   label: string
   value: number
+  orderCount?: number
+  deliveryCount?: number
+  qualityIssueCount?: number
+  reconciliationCount?: number
 }
 
 export interface RiskWarning {

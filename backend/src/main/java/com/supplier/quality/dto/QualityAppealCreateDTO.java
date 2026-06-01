@@ -7,7 +7,9 @@ import lombok.Data;
 @Data
 public class QualityAppealCreateDTO {
 
+    @NotNull(message = "NCR ID不能为空")
     private Long ncrId;
+
     private Long inspectionId;
 
     @NotNull(message = "供应商ID不能为空")

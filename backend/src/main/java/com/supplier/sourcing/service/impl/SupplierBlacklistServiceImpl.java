@@ -92,6 +92,34 @@ public class SupplierBlacklistServiceImpl implements SupplierBlacklistService {
         entity.setStatus(SupplierBlacklistStatusEnum.RESOLVED.getCode());
         entity.setEndTime(LocalDateTime.now());
         supplierBlacklistMapper.updateById(entity);
+
+        restoreSupplierStatusIfNeeded(entity.getSupplierId());
+    }
+
+    /**
+     * 黑名单解除后恢复供应商状态（手动移除 + 定时任务到期共用）
+     * 只有当该供应商没有其他活跃黑名单时才恢复
+     */
+    @Override
+    public void restoreSupplierStatusIfNeeded(Long supplierId) {
+        Long activeCount = supplierBlacklistMapper.selectCount(
+                new LambdaQueryWrapper<SupplierBlacklist>()
+                        .eq(SupplierBlacklist::getSupplierId, supplierId)
+                        .eq(SupplierBlacklist::getStatus, SupplierBlacklistStatusEnum.ACTIVE.getCode()));
+        if (activeCount > 0) {
+            return;
+        }
+
+        SupplierInfo supplier = supplierInfoMapper.selectById(supplierId);
+        if (supplier == null) {
+            return;
+        }
+        supplier.setStatus(SupplierStatusEnum.APPROVED.getCode());
+        supplierInfoMapper.updateById(supplier);
+
+        sysUserMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<SysUser>()
+                .eq("supplier_id", supplierId)
+                .set("status", 1));
     }
 
     /**

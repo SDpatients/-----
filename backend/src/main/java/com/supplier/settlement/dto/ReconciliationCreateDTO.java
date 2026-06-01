@@ -16,7 +16,11 @@ public class ReconciliationCreateDTO {
     private String supplierName;
     @NotBlank(message = "对账周期不能为空")
     private String reconPeriod;
+
+    @NotNull(message = "对账开始日期不能为空")
     private LocalDate startDate;
+
+    @NotNull(message = "对账结束日期不能为空")
     private LocalDate endDate;
     private BigDecimal totalAmount = BigDecimal.ZERO;
     private String remark;

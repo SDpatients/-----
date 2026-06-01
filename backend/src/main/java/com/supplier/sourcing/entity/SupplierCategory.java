@@ -28,6 +28,9 @@ public class SupplierCategory extends BaseEntity {
     /** 状态: 0=禁用, 1=启用 */
     private Integer status;
 
+    /** 分类描述 */
+    private String description;
+
     /** 备注 */
     private String remark;
 }

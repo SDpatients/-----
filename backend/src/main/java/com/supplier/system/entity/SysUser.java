@@ -12,6 +12,8 @@ import java.time.LocalDateTime;
 @TableName("sys_user")
 public class SysUser extends BaseEntity {
 
+    private Long tenantId;
+    private Long orgId;
     private String username;
     private String password;
     private String realName;
@@ -21,6 +23,9 @@ public class SysUser extends BaseEntity {
     private Integer userType;
     private Long supplierId;
     private Integer status;
+    private LocalDateTime passwordUpdateTime;
     private LocalDateTime lastLoginTime;
     private String lastLoginIp;
+    private Integer tokenVersion;
+    private String remark;
 }

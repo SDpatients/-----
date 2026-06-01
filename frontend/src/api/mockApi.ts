@@ -2,6 +2,7 @@ import type { PageQuery, PageResult } from '@/types/business'
 import { asnNotices, attachments, currentUser, importExportTasks, operationLogs, orders, permissions, portalTodos, qualityCases, settlements, supplierPermissions, suppliers, supplierUser, timeline } from './mockData'
 import { logisticsApi } from './logistics'
 import { orderApi } from './order'
+import { orderDetailApi } from './orderDetail'
 import { qualityApi } from './quality'
 import { qualificationApi } from './qualification'
 import { settlementApi } from './settlement'
@@ -77,7 +78,7 @@ export const mockApi = {
   },
   getOrderDetails: async (orderId: number) => {
     try {
-      return await orderApi.lines(orderId)
+      return await orderDetailApi.list(orderId)
     } catch {
       return [] // 后端不可用时返回空数组
     }

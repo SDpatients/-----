@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { orderApi, type DeliveryFeedbackDTO } from '@/api/order'
+import { orderApi, type DeliveryFeedbackCreateDTO, type DeliveryFeedbackLineDTO, type PurchaseOrderQuery } from '@/api/order'
 import { orderChangeApi, type OrderChangeItem } from '@/api/orderChange'
+import { orderDetailApi, type OrderDetailLineItem } from '@/api/orderDetail'
 import { toOrder } from '@/api/adapters'
 import { useUserStore } from '@/stores/user'
 import PageContainer from '@/components/common/PageContainer.vue'
@@ -21,17 +22,17 @@ const supplierId = computed(() => {
 const exportVisible = ref(false)
 const records = ref<PurchaseOrder[]>([])
 const total = ref(0)
-const query = reactive({ pageNum: 1, pageSize: 10, keyword: '', orderStatus: undefined as number | undefined })
+const query = reactive<PurchaseOrderQuery>({ pageNum: 1, pageSize: 10, keyword: '', orderStatus: undefined })
 const loading = ref(false)
 
 const loadData = async () => {
   loading.value = true
   try {
-    const params: Record<string, unknown> = { pageNum: query.pageNum, pageSize: query.pageSize }
+    const params: PurchaseOrderQuery = { pageNum: query.pageNum, pageSize: query.pageSize }
     if (supplierId.value) params.supplierId = supplierId.value
     if (query.keyword) params.keyword = query.keyword
     if (query.orderStatus !== undefined && query.orderStatus !== null) params.orderStatus = query.orderStatus
-    const result = await orderApi.page(params as any)
+    const result = await orderApi.page(params)
     records.value = result.records.map(toOrder)
     total.value = result.total
     if (result.total === 0) query.pageNum = 1
@@ -49,7 +50,7 @@ const resetQuery = () => {
 const handleConfirm = async (row: PurchaseOrder) => {
   try {
     await ElMessageBox.confirm(`确认接单「${row.orderNo}」？`, '确认接单', { type: 'info' })
-    await orderApi.confirm(row.id, '供应商确认接单')
+    await orderApi.confirm(row.id, { remark: '供应商确认接单' })
     ElMessage.success({ message: '已确认接单，系统将推送消息通知采购方', duration: 3000 })
     loadData()
   } catch { /* 取消 */ }
@@ -61,7 +62,7 @@ const handleReject = async (row: PurchaseOrder) => {
       inputType: 'textarea', inputPlaceholder: '拒单原因...',
       inputValidator: (val) => !!val || '拒单原因不能为空',
     })
-    await orderApi.reject(row.id, remark)
+    await orderApi.reject(row.id, { remark })
     ElMessage.success({ message: '已拒单，系统将推送消息通知采购方', duration: 3000 })
     loadData()
   } catch { /* 取消 */ }
@@ -70,25 +71,39 @@ const handleReject = async (row: PurchaseOrder) => {
 // ==================== 交期反馈 (3.2.2) ====================
 const feedbackVisible = ref(false)
 const feedbackOrder = ref<PurchaseOrder | null>(null)
-const feedbackForm = reactive<DeliveryFeedbackDTO>({
-  promisedDeliveryDate: '',
-  batchPlan: '',
-  remark: '',
-})
+const feedbackDetailLines = ref<OrderDetailLineItem[]>([])
+const feedbackLines = ref<DeliveryFeedbackLineDTO[]>([])
+const feedbackRemark = ref('')
 
-const openFeedback = (row: PurchaseOrder) => {
+const openFeedback = async (row: PurchaseOrder) => {
   feedbackOrder.value = row
-  feedbackForm.promisedDeliveryDate = row.deliveryDate || dayjs().add(7, 'day').format('YYYY-MM-DD')
-  feedbackForm.batchPlan = ''
-  feedbackForm.remark = ''
+  feedbackRemark.value = ''
+  try {
+    const lines = await orderDetailApi.list(row.id)
+    feedbackDetailLines.value = lines
+    feedbackLines.value = lines.map(l => ({
+      orderDetailId: Number(l.id || 0),
+      promisedDeliveryDate: row.deliveryDate || dayjs().add(7, 'day').format('YYYY-MM-DD'),
+      plannedQuantity: Number(l.quantity || 0),
+      batchNo: '',
+      remark: '',
+    }))
+  } catch {
+    feedbackDetailLines.value = []
+    feedbackLines.value = []
+  }
   feedbackVisible.value = true
 }
 
 const submitFeedback = async () => {
   if (!feedbackOrder.value) return
-  if (!feedbackForm.promisedDeliveryDate) { ElMessage.warning('请选择承诺交期'); return }
+  const validLines = feedbackLines.value.filter(l => l.orderDetailId && l.promisedDeliveryDate && l.plannedQuantity > 0)
+  if (validLines.length === 0) { ElMessage.warning('请至少填写一条有效的交期反馈明细'); return }
   try {
-    await orderApi.feedbackDelivery(feedbackOrder.value.id, { ...feedbackForm })
+    await orderApi.submitDeliveryFeedback(feedbackOrder.value.id, {
+      lines: validLines,
+      remark: feedbackRemark.value || undefined,
+    })
     ElMessage.success({ message: '交期反馈已提交，系统将推送消息通知采购方', duration: 3000 })
     feedbackVisible.value = false
     loadData()
@@ -154,8 +169,8 @@ onMounted(loadData)
           <el-select v-model="query.orderStatus" placeholder="全部" clearable style="width: 160px" @change="loadData">
             <el-option label="待确认" :value="1" />
             <el-option label="已确认" :value="2" />
-            <el-option label="已取消" :value="7" />
-            <el-option label="已拒单" :value="8" />
+            <el-option label="已取消" :value="5" />
+            <el-option label="已拒单" :value="6" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -193,19 +208,47 @@ onMounted(loadData)
     <ExportDialog v-model="exportVisible" />
 
     <!-- 交期反馈弹窗 -->
-    <el-dialog v-model="feedbackVisible" title="反馈交期" width="550px" :close-on-click-modal="false">
-      <el-form :model="feedbackForm" label-width="110px">
+    <el-dialog v-model="feedbackVisible" title="反馈交期" width="750px" :close-on-click-modal="false">
+      <el-form label-width="110px">
         <el-form-item label="关联订单">
           <el-tag type="info" size="large">{{ feedbackOrder?.orderNo }}</el-tag>
         </el-form-item>
-        <el-form-item label="承诺交期" required>
-          <el-date-picker v-model="feedbackForm.promisedDeliveryDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" placeholder="选择预计可交付日期" />
-        </el-form-item>
-        <el-form-item label="批次交付计划">
-          <el-input v-model="feedbackForm.batchPlan" type="textarea" :rows="3" placeholder="例如：第一批 500件 6月5日、第二批 500件 6月15日" />
-        </el-form-item>
+      </el-form>
+      <el-table :data="feedbackLines" border size="small" max-height="300">
+        <el-table-column label="物料编码" width="120">
+          <template #default="{ row, $index }">
+            {{ feedbackDetailLines[$index]?.materialCode || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="物料名称" min-width="120">
+          <template #default="{ row, $index }">
+            {{ feedbackDetailLines[$index]?.materialName || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="订单数量" width="100">
+          <template #default="{ row, $index }">
+            {{ feedbackDetailLines[$index]?.quantity || 0 }}
+          </template>
+        </el-table-column>
+        <el-table-column label="承诺交期" width="150">
+          <template #default="{ row }">
+            <el-date-picker v-model="row.promisedDeliveryDate" size="small" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+          </template>
+        </el-table-column>
+        <el-table-column label="计划交付数量" width="140">
+          <template #default="{ row }">
+            <el-input-number v-model="row.plannedQuantity" size="small" :min="0" style="width:100%" />
+          </template>
+        </el-table-column>
+        <el-table-column label="批次号" width="120">
+          <template #default="{ row }">
+            <el-input v-model="row.batchNo" size="small" placeholder="批次号" />
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-form label-width="110px" style="margin-top: 12px">
         <el-form-item label="备注">
-          <el-input v-model="feedbackForm.remark" type="textarea" :rows="2" placeholder="交期说明..." />
+          <el-input v-model="feedbackRemark" type="textarea" :rows="2" placeholder="交期说明..." />
         </el-form-item>
       </el-form>
       <template #footer>

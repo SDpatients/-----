@@ -49,23 +49,18 @@ const openCompare = async (row: QuoteRecord) => {
   compareData.value = {}
   supplierNames.value = []
   try {
-    // 加载RFQ
     compareRfq.value = await rfqApi.detail(row.rfqId)
-    // 加载RFQ物料行
     compareRfqLines.value = await rfqApi.lines(row.rfqId)
-    // 加载此RFQ下所有报价
     const quoteResult = await quoteApi.page({ pageNum: 1, pageSize: 100, keyword: '' })
     const rfqQuotes = quoteResult.records.filter(q => q.rfqId === row.rfqId)
 
     const nameSet = new Set<string>()
     const data: typeof compareData.value = {}
 
-    // 为每个RFQ行初始化空数组
     for (const line of compareRfqLines.value) {
       data[line.id as number] = []
     }
 
-    // 加载每个供应商的报价明细行
     for (const quote of rfqQuotes) {
       nameSet.add(quote.supplierName)
       try {
@@ -88,6 +83,10 @@ const openCompare = async (row: QuoteRecord) => {
 
     supplierNames.value = Array.from(nameSet)
     compareData.value = data
+  } catch {
+    compareRfq.value = null
+    compareRfqLines.value = []
+    compareData.value = {}
   } finally {
     compareLoading.value = false
   }
@@ -245,20 +244,20 @@ onMounted(loadData)
               <el-table-column prop="supplierName" label="供应商" width="150" />
               <el-table-column label="单价" width="130" :sortable="'custom'" @sort-change="toggleSort('unitPrice')">
                 <template #default="{ row: r }">
-                  <span :class="{ 'lowest-price': isLowestPrice(line.id as number, r.quoteLine.unitPrice, r.quoteStatus) }">
-                    {{ r.quoteLine.unitPrice?.toLocaleString() }}
+                  <span :class="{ 'lowest-price': isLowestPrice(line.id as number, r.quoteLine?.unitPrice, r.quoteStatus) }">
+                    {{ r.quoteLine?.unitPrice?.toLocaleString() }}
                   </span>
-                  <el-tag v-if="isLowestPrice(line.id as number, r.quoteLine.unitPrice, r.quoteStatus)" size="small" type="success" effect="dark" class="lowest-tag">最低</el-tag>
+                  <el-tag v-if="isLowestPrice(line.id as number, r.quoteLine?.unitPrice, r.quoteStatus)" size="small" type="success" effect="dark" class="lowest-tag">最低</el-tag>
                 </template>
               </el-table-column>
               <el-table-column label="小计" width="120">
-                <template #default="{ row: r }">{{ r.quoteLine.totalPrice?.toLocaleString() }}</template>
+                <template #default="{ row: r }">{{ r.quoteLine?.totalPrice?.toLocaleString() }}</template>
               </el-table-column>
               <el-table-column label="交期" width="120" :sortable="'custom'" @sort-change="toggleSort('deliveryDate')">
-                <template #default="{ row: r }">{{ r.quoteLine.deliveryDate || '-' }}</template>
+                <template #default="{ row: r }">{{ r.quoteLine?.deliveryDate || '-' }}</template>
               </el-table-column>
               <el-table-column prop="quoteLine.paymentTerms" label="付款条件" width="110">
-                <template #default="{ row: r }">{{ r.quoteLine.paymentTerms || '-' }}</template>
+                <template #default="{ row: r }">{{ r.quoteLine?.paymentTerms || '-' }}</template>
               </el-table-column>
               <el-table-column prop="quoteLine.remark" label="备注" min-width="130" show-overflow-tooltip />
               <el-table-column label="报价状态" width="90">

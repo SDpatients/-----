@@ -34,5 +34,7 @@ public class DeliveryNotice extends BaseEntity {
     private String batchNo;
     private LocalDate productionDate;
     private LocalDate expiryDate;
+    private LocalDateTime submitTime;
+    private LocalDateTime closeTime;
     private String remark;
 }

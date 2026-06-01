@@ -12,6 +12,7 @@ public class SupplierQualificationCreateDTO {
     @NotNull(message = "供应商ID不能为空")
     private Long supplierId;
 
+    @NotBlank(message = "资质类型不能为空")
     private String qualType;
 
     @NotBlank(message = "资质名称不能为空")

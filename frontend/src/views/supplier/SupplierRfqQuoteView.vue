@@ -64,7 +64,12 @@ const quoteForm = reactive({
   remark: '',
 })
 // 含税/未税切换
-const taxMode = ref<'taxInclusive' | 'taxExclusive'>('taxInclusive') // 含税/未税
+const taxMode = ref<'taxInclusive' | 'taxExclusive'>('taxInclusive')
+
+const formRef = ref()
+const formRules = {
+  currency: [{ required: true, message: '币种不能为空', trigger: 'change' }],
+}
 
 // 报价附件
 const quoteAttachments = ref<{ name: string; file?: File }[]>([])
@@ -122,6 +127,8 @@ const recalcTotal = () => {
 
 const submitQuote = async () => {
   if (!currentRfq.value) return
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) return
   const validLines = quoteLines.value.filter(l => l.unitPrice > 0)
   if (validLines.length === 0) {
     ElMessage.warning('请至少填写一行物料单价')
@@ -417,7 +424,7 @@ onMounted(loadRfq)
 
     <!-- ==================== 报价弹窗（含明细行、含税切换、附件） ==================== -->
     <el-dialog v-model="dialogVisible" title="参与报价" width="960px" fullscreen destroy-on-close>
-      <el-form :model="quoteForm" label-width="100px">
+      <el-form ref="formRef" :model="quoteForm" :rules="formRules" label-width="100px">
         <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="报价单号">
@@ -430,7 +437,7 @@ onMounted(loadRfq)
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="币种">
+            <el-form-item label="币种" prop="currency">
               <el-select v-model="quoteForm.currency" style="width: 100%">
                 <el-option label="CNY" value="CNY" />
                 <el-option label="USD" value="USD" />

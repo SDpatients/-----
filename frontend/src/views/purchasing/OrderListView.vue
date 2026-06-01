@@ -3,8 +3,9 @@ import { ArrowDown } from '@element-plus/icons-vue'
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
-import { orderApi } from '@/api/order'
-import { orderDetailApi, type OrderDetailLineItem } from '@/api/orderDetail'
+import { orderApi, type PurchaseOrderQuery } from '@/api/order'
+import { orderDetailApi, type OrderDetailLineItem, type PurchaseOrderDetailCreateDTO } from '@/api/orderDetail'
+import { orderTrackApi, type OrderTrackVO } from '@/api/orderTrack'
 import { toOrder } from '@/api/adapters'
 import { dashboardApi } from '@/api/dashboard'
 import PageContainer from '@/components/common/PageContainer.vue'
@@ -22,7 +23,7 @@ const total = ref(0)
 const selectedRow = ref<PurchaseOrder | null>(null)
 const exportVisible = ref(false)
 const dateRange = ref<string[]>([])
-const query = reactive({ pageNum: 1, pageSize: 10, keyword: '', orderStatus: undefined as number | undefined })
+const query = reactive<PurchaseOrderQuery>({ pageNum: 1, pageSize: 10, keyword: '', orderStatus: undefined })
 
 // 风险预警
 const risks = ref<RiskWarning[]>([])
@@ -40,14 +41,14 @@ const loadRisks = async () => {
 const loadData = async () => {
   loading.value = true
   try {
-    const params: Record<string, unknown> = { pageNum: query.pageNum, pageSize: query.pageSize }
+    const params: PurchaseOrderQuery = { pageNum: query.pageNum, pageSize: query.pageSize }
     if (query.keyword) params.keyword = query.keyword
     if (query.orderStatus !== undefined && query.orderStatus !== null) params.orderStatus = query.orderStatus
     if (dateRange.value?.length === 2) {
       params.startDate = dateRange.value[0]
       params.endDate = dateRange.value[1]
     }
-    const result = await orderApi.page(params as any)
+    const result = await orderApi.page(params)
     records.value = result.records.map(toOrder)
     total.value = result.total
     if (result.total === 0) query.pageNum = 1
@@ -78,7 +79,7 @@ const showOps = (row: PurchaseOrder) => {
 const handleConfirm = async (row: PurchaseOrder) => {
   try {
     const { value: remark } = await ElMessageBox.prompt('请输入确认备注（可选）', '确认接单', { inputType: 'textarea', inputPlaceholder: '备注信息...' })
-    await orderApi.confirm(row.id, remark || undefined)
+    await orderApi.confirm(row.id, { remark: remark || undefined })
     ElNotification({ title: '订单确认', message: `订单 ${row.orderNo} 已确认，系统已推送消息通知供应商`, type: 'success', duration: 4000 })
     ElMessage.success('订单已确认')
     loadData()
@@ -92,7 +93,7 @@ const handleReject = async (row: PurchaseOrder) => {
       inputPlaceholder: '请填写拒单原因...',
       inputValidator: (val) => !!val || '拒单原因不能为空',
     })
-    await orderApi.reject(row.id, remark)
+    await orderApi.reject(row.id, { remark })
     ElNotification({ title: '订单拒单', message: `订单 ${row.orderNo} 已拒单，系统已推送消息通知供应商`, type: 'warning', duration: 4000 })
     ElMessage.success('已拒单')
     loadData()
@@ -116,7 +117,7 @@ const handleClose = async (row: PurchaseOrder) => {
       inputType: 'textarea',
       inputPlaceholder: '如：全部收货完成，确认关闭...',
     })
-    await orderApi.close(row.id, remark || undefined)
+    await orderApi.close(row.id, { remark: remark || undefined })
     ElNotification({ title: '订单关闭', message: `订单 ${row.orderNo} 已完成关闭，系统已推送消息通知供应商`, type: 'success', duration: 4000 })
     ElMessage.success('订单已关闭')
     loadData()
@@ -184,13 +185,36 @@ const openCreateDialog = () => {
 
 const submitCreate = async () => {
   if (!createForm.supplierId) { ElMessage.warning('请选择供应商'); return }
+  if (!createForm.orderDate) { ElMessage.warning('请选择订单日期'); return }
   try {
-    // 1. Create order header
-    const orderId = await orderApi.create(createForm)
-    // 2. Create detail lines
+    const orderId = await orderApi.create({
+      orderNo: createForm.orderNo || undefined,
+      supplierId: createForm.supplierId,
+      orderDate: createForm.orderDate,
+      deliveryDate: createForm.deliveryDate || undefined,
+      currency: createForm.currency,
+      totalAmount: createForm.totalAmount,
+      deliveryAddress: createForm.deliveryAddress || undefined,
+      remark: createForm.remark || undefined,
+    })
     if (detailLines.value.length > 0) {
       for (const line of detailLines.value) {
-        await orderDetailApi.create({ ...line, orderId })
+        await orderDetailApi.create({
+          orderId: orderId,
+          lineNo: line.lineNo,
+          materialCode: line.materialCode,
+          materialName: line.materialName,
+          materialSpec: line.materialSpec || undefined,
+          materialModel: undefined,
+          unit: line.unit || undefined,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          taxRate: line.taxRate || undefined,
+          taxAmount: line.taxAmount || undefined,
+          amount: line.amount,
+          deliveryDate: line.deliveryDate || undefined,
+          remark: line.remark || undefined,
+        })
       }
     }
     ElMessage.success('订单创建成功')

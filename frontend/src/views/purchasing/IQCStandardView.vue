@@ -32,17 +32,25 @@ const resetQuery = () => { query.keyword = ''; query.status = undefined; loadDat
 const dialogVisible = ref(false)
 const dialogTitle = ref('新建检验标准')
 const editingId = ref<number | string | null>(null)
+const formRef = ref()
 const form = reactive<Partial<InspectionStandard>>({
-  materialCode: '', materialName: '', checkItem: '', checkMethod: '',
+  standardName: '', materialCode: '', materialName: '', checkItem: '', checkMethod: '',
   sampleRule: '', sampleQty: 0, acValue: 0, reValue: 0,
   lowerLimit: '', upperLimit: '', unit: '', severity: '一般',
+})
+
+const formRules = reactive({
+  standardName: [{ required: true, message: '标准名称不能为空', trigger: 'blur' }],
+  materialCode: [{ required: true, message: '物料编码不能为空', trigger: 'blur' }],
+  checkItem: [{ required: true, message: '检验项目不能为空', trigger: 'blur' }],
+  sampleRule: [{ required: true, message: '抽样规则不能为空', trigger: 'change' }],
 })
 
 const openCreate = () => {
   editingId.value = null
   dialogTitle.value = '新建检验标准'
   Object.assign(form, {
-    materialCode: '', materialName: '', checkItem: '', checkMethod: '',
+    standardName: '', materialCode: '', materialName: '', checkItem: '', checkMethod: '',
     sampleRule: '', sampleQty: 0, acValue: 0, reValue: 0,
     lowerLimit: '', upperLimit: '', unit: '', severity: '一般',
   })
@@ -53,7 +61,7 @@ const openEdit = (row: InspectionStandard) => {
   editingId.value = row.id
   dialogTitle.value = '编辑检验标准'
   Object.assign(form, {
-    materialCode: row.materialCode, materialName: row.materialName,
+    standardName: row.standardName, materialCode: row.materialCode, materialName: row.materialName,
     checkItem: row.checkItem, checkMethod: row.checkMethod || '',
     sampleRule: row.sampleRule, sampleQty: row.sampleQty,
     acValue: row.acValue, reValue: row.reValue,
@@ -64,7 +72,8 @@ const openEdit = (row: InspectionStandard) => {
 }
 
 const submitForm = async () => {
-  if (!form.materialCode || !form.checkItem) { ElMessage.warning('物料编码和检验项目不能为空'); return }
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) return
   try {
     if (editingId.value) {
       await inspectionStandardApi.update(editingId.value, form)
@@ -127,6 +136,7 @@ onMounted(loadData)
 
     <el-table v-loading="loading" :data="records" border highlight-current-row>
       <el-table-column prop="standardNo" label="标准编号" width="150" />
+      <el-table-column prop="standardName" label="标准名称" min-width="160" show-overflow-tooltip />
       <el-table-column prop="materialCode" label="物料编码" width="120" />
       <el-table-column prop="materialName" label="物料名称" min-width="140" show-overflow-tooltip />
       <el-table-column prop="checkItem" label="检验项目" min-width="150" show-overflow-tooltip />
@@ -166,10 +176,17 @@ onMounted(loadData)
 
     <!-- 新增/编辑弹窗 -->
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="680px" destroy-on-close :close-on-click-modal="false">
-      <el-form :model="form" label-width="100px">
+      <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px">
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="物料编码" required>
+            <el-form-item label="标准名称" prop="standardName">
+              <el-input v-model="form.standardName" placeholder="如：检验标准-123" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="物料编码" prop="materialCode">
               <el-input v-model="form.materialCode" placeholder="请输入物料编码" />
             </el-form-item>
           </el-col>
@@ -181,7 +198,7 @@ onMounted(loadData)
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="检验项目" required>
+            <el-form-item label="检验项目" prop="checkItem">
               <el-input v-model="form.checkItem" placeholder="如：外观检查、尺寸公差" />
             </el-form-item>
           </el-col>
@@ -193,7 +210,7 @@ onMounted(loadData)
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="抽样规则" required>
+            <el-form-item label="抽样规则" prop="sampleRule">
               <el-select v-model="form.sampleRule" style="width: 100%" placeholder="请选择">
                 <el-option label="GB/T 2828.1 一般检验水平II" value="GB/T 2828.1-II" />
                 <el-option label="GB/T 2828.1 特殊检验水平S-3" value="GB/T 2828.1-S3" />

@@ -146,6 +146,14 @@ router.beforeEach(async (to) => {
     console.debug(`[Router] !! 无 token → 重定向 /login?redirect=${to.fullPath}`)
     return `/login?redirect=${to.fullPath}`
   }
+  if (!userStore.tokenExpiresAt) {
+    userStore.restoreTokenExpiry()
+  }
+  if (userStore.tokenExpiresAt && Date.now() > userStore.tokenExpiresAt) {
+    console.debug('[Router] !! token 已过期 → 重定向 /login')
+    userStore.logout()
+    return `/login?redirect=${to.fullPath}`
+  }
   if (!userStore.user) {
     console.debug('[Router] … 加载用户信息')
     await userStore.loadCurrentUser()

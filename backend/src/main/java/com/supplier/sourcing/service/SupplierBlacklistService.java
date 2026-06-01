@@ -17,4 +17,6 @@ public interface SupplierBlacklistService {
     void update(Long id, SupplierBlacklistUpdateDTO dto);
 
     void remove(Long id);
+
+    void restoreSupplierStatusIfNeeded(Long supplierId);
 }

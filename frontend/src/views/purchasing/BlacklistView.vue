@@ -8,6 +8,12 @@ import type { SupplierBlacklist } from '@/types/business'
 import dayjs from 'dayjs'
 
 const loading = ref(false)
+const createFormRef = ref()
+const editFormRef = ref()
+const formRules = {
+  supplierName: [{ required: true, message: '供应商名称不能为空', trigger: 'blur' }],
+  reason: [{ required: true, message: '拉黑原因不能为空', trigger: 'blur' }],
+}
 const records = ref<SupplierBlacklist[]>([])
 const total = ref(0)
 const query = reactive({ pageNum: 1, pageSize: 10, supplierName: '', status: undefined as number | undefined })
@@ -69,15 +75,26 @@ const openCreate = () => {
 }
 
 const submitCreate = async () => {
-  if (!createForm.supplierName) { ElMessage.warning('请输入供应商名称'); return }
-  if (!createForm.reason) { ElMessage.warning('请输入拉黑原因'); return }
+  try { await createFormRef.value?.validate() } catch { return }
+  if (createForm.startTime && createForm.endTime) {
+    if (new Date(createForm.startTime).getTime() >= new Date(createForm.endTime).getTime()) {
+      ElMessage.warning('生效时间必须早于结束时间')
+      return
+    }
+  }
+  if (createForm.endTime) {
+    if (new Date(createForm.endTime).getTime() <= Date.now()) {
+      ElMessage.warning('结束时间必须大于当前时间')
+      return
+    }
+  }
   try {
     await blacklistApi.create({
       supplierId: Number(createForm.supplierId) || 0,
       supplierName: createForm.supplierName,
       creditCode: createForm.creditCode || undefined,
       reason: createForm.reason,
-      startTime: createForm.startTime || dayjs().format('YYYY-MM-DD HH:mm:ss'),
+      startTime: createForm.startTime || dayjs().format('YYYY-MM-DDTHH:mm:ss'),
       endTime: createForm.endTime || undefined,
     })
     ElMessage.success('已加入黑名单')
@@ -100,6 +117,13 @@ const openEdit = (row: SupplierBlacklist) => {
 
 const submitEdit = async () => {
   if (!editRow.value) return
+  try { await editFormRef.value?.validate() } catch { return }
+  if (editForm.endTime) {
+    if (new Date(editForm.endTime).getTime() <= Date.now()) {
+      ElMessage.warning('结束时间必须大于当前时间')
+      return
+    }
+  }
   try {
     await blacklistApi.update(editRow.value.id, {
       reason: editForm.reason,
@@ -173,24 +197,24 @@ onMounted(loadData)
     <!-- 新增黑名单 -->
     <el-dialog v-model="showCreateDialog" title="加入黑名单" width="520px" :close-on-click-modal="false">
       <el-alert type="warning" :closable="false" show-icon title="加入黑名单后，该供应商的信用代码将在注册/创建时被拦截" class="mb-4" />
-      <el-form :model="createForm" label-width="100px">
+      <el-form ref="createFormRef" :model="createForm" :rules="formRules" label-width="100px">
         <el-form-item label="供应商ID">
           <el-input v-model="createForm.supplierId" placeholder="选填，关联已有供应商" />
         </el-form-item>
-        <el-form-item label="供应商名称" required>
+        <el-form-item label="供应商名称" prop="supplierName">
           <el-input v-model="createForm.supplierName" placeholder="请输入供应商名称" />
         </el-form-item>
         <el-form-item label="统一信用代码">
           <el-input v-model="createForm.creditCode" placeholder="选填，用于拦截校验" />
         </el-form-item>
-        <el-form-item label="拉黑原因" required>
+        <el-form-item label="拉黑原因" prop="reason">
           <el-input v-model="createForm.reason" type="textarea" :rows="3" placeholder="请输入拉黑原因" />
         </el-form-item>
         <el-form-item label="生效时间">
-          <el-date-picker v-model="createForm.startTime" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="立即生效" style="width:100%" />
+          <el-date-picker v-model="createForm.startTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="立即生效" style="width:100%" />
         </el-form-item>
         <el-form-item label="结束时间">
-          <el-date-picker v-model="createForm.endTime" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="永久（选填）" style="width:100%" />
+          <el-date-picker v-model="createForm.endTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="永久（选填）" style="width:100%" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -204,12 +228,12 @@ onMounted(loadData)
       <div v-if="editRow" class="audit-info mb-4">
         <el-tag type="danger">供应商：{{ editRow.supplierName }}</el-tag>
       </div>
-      <el-form :model="editForm" label-width="90px">
-        <el-form-item label="拉黑原因">
+      <el-form ref="editFormRef" :model="editForm" :rules="formRules" label-width="90px">
+        <el-form-item label="拉黑原因" prop="reason">
           <el-input v-model="editForm.reason" type="textarea" :rows="3" />
         </el-form-item>
         <el-form-item label="结束时间">
-          <el-date-picker v-model="editForm.endTime" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="永久（选填）" style="width:100%" />
+          <el-date-picker v-model="editForm.endTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="永久（选填）" style="width:100%" />
         </el-form-item>
       </el-form>
       <template #footer>

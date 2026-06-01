@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { supplierApi } from '@/api/supplier'
+import { toSupplier } from '@/api/adapters'
 import type { Supplier } from '@/types/business'
 
 const props = withDefaults(defineProps<{
@@ -31,7 +32,7 @@ const remoteSearch = (keyword: string) => {
     loading.value = true
     try {
       const result = await supplierApi.page({ pageNum: 1, pageSize: 20, keyword })
-      options.value = result.records
+      options.value = result.records.map(toSupplier)
     } finally {
       loading.value = false
     }

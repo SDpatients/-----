@@ -14,11 +14,11 @@ export const invoiceApi = {
   upload: (id: number | string, data: Record<string, unknown>) =>
     request.post<void, void>(`/v1/invoices/${id}/upload`, data),
 
-  verify: (id: number | string) => request.post<void, void>(`/v1/invoices/${id}/verify`),
+  verify: (id: number | string, data?: Record<string, unknown>) => request.post<void, void>(`/v1/invoices/${id}/verify`, data || {}),
 
-  certify: (id: number | string) => request.post<void, void>(`/v1/invoices/${id}/certify`),
+  certify: (id: number | string, data?: Record<string, unknown>) => request.post<void, void>(`/v1/invoices/${id}/certify`, data || {}),
 
-  cancel: (id: number | string, data?: Record<string, unknown>) => request.post<void, void>(`/v1/invoices/${id}/void`, data),
+  cancel: (id: number | string, data?: Record<string, unknown>) => request.post<void, void>(`/v1/invoices/${id}/void`, data || {}),
 
   /** OCR 发票识别 */
   ocrRecognize: (file: File) => {
@@ -42,14 +42,14 @@ export const deductionApi = {
 
   create: (data: Record<string, unknown>) => request.post<number, number>('/v1/deductions', data),
 
-  submit: (id: number | string) => request.post<void, void>(`/v1/deductions/${id}/submit`),
+  submit: (id: number | string, data?: Record<string, unknown>) => request.post<void, void>(`/v1/deductions/${id}/submit`, data || {}),
 
-  confirm: (id: number | string) => request.post<void, void>(`/v1/deductions/${id}/confirm`),
+  confirm: (id: number | string, data?: Record<string, unknown>) => request.post<void, void>(`/v1/deductions/${id}/confirm`, data || {}),
 
-  dispute: (id: number | string, data: { disputeReason: string }) =>
-    request.post<void, void>(`/v1/deductions/${id}/dispute`, data),
+  dispute: (id: number | string, data?: Record<string, unknown>) =>
+    request.post<void, void>(`/v1/deductions/${id}/dispute`, data || {}),
 
-  book: (id: number | string) => request.post<void, void>(`/v1/deductions/${id}/book`),
+  book: (id: number | string, data?: Record<string, unknown>) => request.post<void, void>(`/v1/deductions/${id}/book`, data || {}),
 }
 
 export const paymentApi = {
@@ -60,9 +60,15 @@ export const paymentApi = {
 
   create: (data: Record<string, unknown>) => request.post<number, number>('/v1/payments', data),
 
-  pay: (id: number | string) => request.post<void, void>(`/v1/payments/${id}/pay`),
+  submitApproval: (id: number | string) => request.post<void, void>(`/v1/payments/${id}/submit-approval`),
 
-  reject: (id: number | string) => request.post<void, void>(`/v1/payments/${id}/reject`),
+  schedule: (id: number | string, data: Record<string, unknown>) => request.post<void, void>(`/v1/payments/${id}/schedule`, data),
+
+  pay: (id: number | string, data?: Record<string, unknown>) => request.post<void, void>(`/v1/payments/${id}/pay`, data || {}),
+
+  reject: (id: number | string, data?: Record<string, unknown>) => request.post<void, void>(`/v1/payments/${id}/reject`, data || {}),
+
+  cancel: (id: number | string, data?: Record<string, unknown>) => request.post<void, void>(`/v1/payments/${id}/cancel`, data || {}),
 
   /** 获取付款回传状态日志 */
   callbackLogs: (id: number | string) => request.get<PaymentCallbackLog[], PaymentCallbackLog[]>(`/v1/payments/${id}/callback-logs`),

@@ -11,6 +11,7 @@ public class InspectionStandardCreateDTO {
     private String materialCode;
     @NotBlank(message = "物料名称不能为空")
     private String materialName;
+    @NotBlank(message = "标准名称不能为空")
     private String standardName;
     private String sampleRule;
     private String versionNo;

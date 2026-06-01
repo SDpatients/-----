@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { settlementApi } from '@/api/settlement'
-import { toSettlement } from '@/api/adapters'
+import { supplierApi } from '@/api/supplier'
+import { toSettlement, toSupplier } from '@/api/adapters'
 import PageContainer from '@/components/common/PageContainer.vue'
-import SupplierSelector from '@/components/business/SupplierSelector.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import ExportDialog from '@/components/business/ExportDialog.vue'
 import type { Settlement, Supplier } from '@/types/business'
@@ -49,7 +49,6 @@ const handleSend = async (row: Settlement) => {
 
 const handleConfirm = async (row: Settlement) => {
   try {
-    // 6.2.7 先检查是否有差异
     const lines = await settlementApi.lines(row.id)
     const hasDiff = lines.some((l: any) => l.diffAmount !== 0)
     if (hasDiff) {
@@ -62,7 +61,6 @@ const handleConfirm = async (row: Settlement) => {
   } catch { /* 拦截器处理 */ }
 }
 
-// 6.2.3 冻结/解冻操作
 const handleFreeze = async (row: Settlement) => {
   try {
     await ElMessageBox.confirm(`确认冻结对账单「${row.statementNo}」？冻结后明细不可修改。`, '冻结确认', { type: 'warning' })
@@ -81,7 +79,84 @@ const handleUnfreeze = async (row: Settlement) => {
   } catch { /* */ }
 }
 
-// 新增对账单
+/* ==================== 供应商选择弹窗 ==================== */
+const supplierDialogVisible = ref(false)
+const supplierLoading = ref(false)
+const supplierList = ref<Supplier[]>([])
+const supplierTotal = ref(0)
+const supplierQuery = reactive({ pageNum: 1, pageSize: 10, keyword: '' })
+const tempSelectedSupplier = ref<Supplier | null>(null)
+
+const openSupplierDialog = () => {
+  tempSelectedSupplier.value = null
+  supplierQuery.pageNum = 1
+  supplierQuery.keyword = ''
+  loadSupplierList()
+  supplierDialogVisible.value = true
+}
+
+const loadSupplierList = async () => {
+  supplierLoading.value = true
+  try {
+    const result = await supplierApi.page({
+      pageNum: supplierQuery.pageNum,
+      pageSize: supplierQuery.pageSize,
+      keyword: supplierQuery.keyword || undefined,
+    } as any)
+    supplierList.value = result.records.map(toSupplier)
+    supplierTotal.value = result.total
+  } finally { supplierLoading.value = false }
+}
+
+const searchSupplier = () => {
+  supplierQuery.pageNum = 1
+  loadSupplierList()
+}
+
+const resetSupplierQuery = () => {
+  supplierQuery.keyword = ''
+  supplierQuery.pageNum = 1
+  loadSupplierList()
+}
+
+const onSupplierPageChange = () => {
+  loadSupplierList()
+}
+
+const onSupplierPageSizeChange = () => {
+  supplierQuery.pageNum = 1
+  loadSupplierList()
+}
+
+const isSupplierSelected = (row: Supplier) => {
+  return tempSelectedSupplier.value?.id === row.id
+}
+
+const toggleSupplierSelection = (row: Supplier) => {
+  if (isSupplierSelected(row)) {
+    tempSelectedSupplier.value = null
+  } else {
+    tempSelectedSupplier.value = row
+  }
+}
+
+const confirmSupplierSelection = () => {
+  if (!tempSelectedSupplier.value) {
+    ElMessage.warning('请选择一个供应商')
+    return
+  }
+  createForm.supplierId = Number(tempSelectedSupplier.value.id)
+  createForm.supplierName = tempSelectedSupplier.value.name
+  if (!createForm.reconNo) generateReconNo()
+  supplierDialogVisible.value = false
+}
+
+/* ==================== 新增对账单 ==================== */
+const formRef = ref<FormInstance>()
+const formRules: FormRules = {
+  supplierId: [{ required: true, message: '请选择供应商', trigger: 'change' }],
+  reconPeriod: [{ required: true, message: '对账期间不能为空', trigger: 'blur' }],
+}
 const showCreateDialog = ref(false)
 const createForm = reactive({
   reconNo: '', supplierId: null as number | null, supplierName: '', reconPeriod: dayjs().format('YYYY-MM'),
@@ -92,12 +167,6 @@ const generateReconNo = () => {
   const date = dayjs().format('YYYYMMDD')
   const rand = Math.floor(Math.random() * 9000 + 1000)
   createForm.reconNo = `REC${date}${rand}`
-}
-
-const onSupplierSelect = (supplier: Supplier) => {
-  createForm.supplierId = Number(supplier.id)
-  createForm.supplierName = supplier.name
-  if (!createForm.reconNo) generateReconNo()
 }
 
 const openCreateDialog = () => {
@@ -113,10 +182,7 @@ const openCreateDialog = () => {
 }
 
 const submitCreate = async () => {
-  if (!createForm.supplierId) {
-    ElMessage.warning('请选择供应商')
-    return
-  }
+  if (!await formRef.value?.validate()) return
   try {
     await settlementApi.create(createForm)
     ElMessage.success('对账单创建成功')
@@ -184,10 +250,10 @@ onMounted(loadData)
     <el-dialog v-model="showCreateDialog" title="新增对账单" width="600px" :close-on-click-modal="false">
       <el-alert type="info" :closable="false" show-icon class="mb-4">
         <template #title>
-          搜索并选择供应商后，系统将自动填入供应商名称
+          点击"选择供应商"从供应商库中查找并选择
         </template>
       </el-alert>
-      <el-form :model="createForm" label-width="100px">
+      <el-form ref="formRef" :model="createForm" :rules="formRules" label-width="100px">
         <el-form-item label="对账单号">
           <el-input v-model="createForm.reconNo" placeholder="留空自动生成（选填）">
             <template #append>
@@ -195,13 +261,19 @@ onMounted(loadData)
             </template>
           </el-input>
         </el-form-item>
-        <el-form-item label="供应商" required>
-          <SupplierSelector v-model="createForm.supplierId" @select="onSupplierSelect" />
+        <el-form-item label="供应商" prop="supplierId">
+          <div class="supplier-select-area">
+            <el-button type="primary" plain @click="openSupplierDialog">
+              <el-icon style="margin-right: 4px"><svg viewBox="0 0 1024 1024" width="1em" height="1em"><path d="M512 64a448 448 0 110 896 448 448 0 010-896z m0 64a384 384 0 100 768 384 384 0 000-768z m-42.667 213.333h85.334v170.667h170.666v85.333h-170.666v170.667h-85.334V597.333H298.667V512h170.666V341.333z" fill="currentColor"/></svg></el-icon>
+              选择供应商
+            </el-button>
+            <el-tag v-if="createForm.supplierName" type="success" size="large" closable @close="createForm.supplierId = null; createForm.supplierName = ''">
+              {{ createForm.supplierName }}
+            </el-tag>
+            <span v-else class="supplier-hint">点击按钮从供应商库中选择</span>
+          </div>
         </el-form-item>
-        <el-form-item v-if="createForm.supplierName" label="已选供应商">
-          <el-tag type="success" size="large">{{ createForm.supplierName }}</el-tag>
-        </el-form-item>
-        <el-form-item label="对账期间" required>
+        <el-form-item label="对账期间" prop="reconPeriod">
           <el-input v-model="createForm.reconPeriod" placeholder="如：2026-05" />
         </el-form-item>
         <el-row :gutter="16">
@@ -228,6 +300,84 @@ onMounted(loadData)
         <el-button type="primary" @click="submitCreate">确认新增</el-button>
       </template>
     </el-dialog>
+
+    <!-- 供应商选择弹窗 -->
+    <el-dialog v-model="supplierDialogVisible" title="选择供应商" width="860px" :close-on-click-modal="false">
+      <div class="search-panel">
+        <el-form inline :model="supplierQuery" @submit.prevent="searchSupplier">
+          <el-form-item label="关键词">
+            <el-input v-model="supplierQuery.keyword" placeholder="供应商名称/编码" clearable @clear="resetSupplierQuery" @keyup.enter="searchSupplier" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="searchSupplier">查询</el-button>
+            <el-button @click="resetSupplierQuery">重置</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+      <el-table
+        v-loading="supplierLoading"
+        :data="supplierList"
+        border
+        highlight-current-row
+        @row-click="toggleSupplierSelection"
+        row-key="id"
+        max-height="420"
+      >
+        <el-table-column width="55" align="center">
+          <template #default="{ row }">
+            <el-radio :model-value="isSupplierSelected(row)" @click.stop />
+          </template>
+        </el-table-column>
+        <el-table-column prop="code" label="供应商编码" width="140" />
+        <el-table-column prop="name" label="供应商名称" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="category" label="类别" width="120" />
+        <el-table-column prop="level" label="等级" width="100" />
+        <el-table-column prop="contact" label="联系人" width="100" />
+        <el-table-column prop="phone" label="电话" width="130" />
+      </el-table>
+      <el-pagination
+        v-model:current-page="supplierQuery.pageNum"
+        v-model:page-size="supplierQuery.pageSize"
+        :total="supplierTotal"
+        layout="total, prev, pager, next, sizes"
+        class="mt-4"
+        @current-change="onSupplierPageChange"
+        @size-change="onSupplierPageSizeChange"
+      />
+      <div class="dialog-selection-info">
+        <span v-if="tempSelectedSupplier">
+          已选择: <strong>{{ tempSelectedSupplier.name }}</strong>（{{ tempSelectedSupplier.code }}）
+        </span>
+        <span v-else class="no-selection">点击行选择一个供应商</span>
+      </div>
+      <template #footer>
+        <el-button @click="supplierDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmSupplierSelection">确认选择</el-button>
+      </template>
+    </el-dialog>
+
     <ExportDialog v-model="exportVisible" />
   </PageContainer>
 </template>
+
+<style scoped>
+.supplier-select-area {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.supplier-hint {
+  color: #909399;
+  font-size: 13px;
+}
+.dialog-selection-info {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #606266;
+}
+.dialog-selection-info .no-selection {
+  color: #909399;
+}
+</style>

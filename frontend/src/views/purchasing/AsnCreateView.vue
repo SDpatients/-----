@@ -1,19 +1,27 @@
 <script setup lang="ts">
 import { reactive, ref, computed } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { logisticsApi } from '@/api/logistics'
-import { orderApi } from '@/api/order'
+import { orderApi, type PurchaseOrderQuery } from '@/api/order'
+import { orderDetailApi } from '@/api/orderDetail'
+import { supplierApi } from '@/api/supplier'
+import { toOrder, toSupplier } from '@/api/adapters'
 import { getIdempotentHeaders } from '@/utils/idempotent'
 import PageContainer from '@/components/common/PageContainer.vue'
-import OrderSelector from '@/components/business/OrderSelector.vue'
 import DeliveryLineTable from '@/components/business/DeliveryLineTable.vue'
-import type { PurchaseOrder, DeliveryLineItem } from '@/types/business'
+import type { PurchaseOrder, Supplier, DeliveryLineItem } from '@/types/business'
 import type { OrderLineOption } from '@/components/business/DeliveryLineTable.vue'
 import dayjs from 'dayjs'
 
 const router = useRouter()
 const loading = ref(false)
+const formRef = ref<FormInstance>()
+const formRules = reactive<FormRules>({
+  orderId: [{ required: true, message: '请选择关联订单', trigger: 'change' }],
+  planDeliveryDate: [{ required: true, message: '计划送货日期不能为空', trigger: 'change' }],
+})
 const selectedOrder = ref<PurchaseOrder | null>(null)
 const orderLineOptions = ref<OrderLineOption[]>([])
 
@@ -42,18 +50,16 @@ const onOrderSelect = async (order: PurchaseOrder) => {
   form.supplierName = order.supplierName
   if (!form.noticeNo) generateNoticeNo()
   if (!form.planDeliveryDate) form.planDeliveryDate = order.deliveryDate || ''
-
   try {
-    const result = await orderApi.detail(order.id)
-    const lines = (result as any).lines || (result as any).orderLines || []
-    orderLineOptions.value = lines.map((l: any) => ({
-      lineNo: l.lineNo || l.id,
+    const lines = await orderDetailApi.list(order.id)
+    orderLineOptions.value = lines.map(l => ({
+      lineNo: l.lineNo || Number(l.id),
       materialCode: l.materialCode || '',
       materialName: l.materialName || '',
-      spec: l.spec || '',
+      spec: l.materialSpec || '',
       unit: l.unit || '',
       orderQty: Number(l.quantity || 0),
-      shippedQty: Number(l.receivedQty || 0),
+      shippedQty: Number(l.deliveredQty || 0),
       deliveryDate: l.deliveryDate || '',
     }))
   } catch {
@@ -63,11 +69,102 @@ const onOrderSelect = async (order: PurchaseOrder) => {
 
 const totalShipQty = computed(() => deliveryLines.value.reduce((s, l) => s + l.shipQty, 0))
 
+/* ==================== 订单选择弹窗 ==================== */
+const orderDialogVisible = ref(false)
+const orderLoading = ref(false)
+const orderList = ref<PurchaseOrder[]>([])
+const orderTotal = ref(0)
+const orderQuery = reactive({ pageNum: 1, pageSize: 10, keyword: '' })
+const tempSelectedOrder = ref<PurchaseOrder | null>(null)
+
+const openOrderDialog = () => {
+  tempSelectedOrder.value = null
+  orderQuery.pageNum = 1
+  orderQuery.keyword = ''
+  loadOrderList()
+  orderDialogVisible.value = true
+}
+
+const loadOrderList = async () => {
+  orderLoading.value = true
+  try {
+    const result = await orderApi.page({
+      pageNum: orderQuery.pageNum,
+      pageSize: orderQuery.pageSize,
+      keyword: orderQuery.keyword || undefined,
+    })
+    orderList.value = result.records.map(toOrder)
+    orderTotal.value = result.total
+  } finally { orderLoading.value = false }
+}
+
+const searchOrder = () => { orderQuery.pageNum = 1; loadOrderList() }
+const resetOrderQuery = () => { orderQuery.keyword = ''; orderQuery.pageNum = 1; loadOrderList() }
+const onOrderPageChange = () => { loadOrderList() }
+const onOrderPageSizeChange = () => { orderQuery.pageNum = 1; loadOrderList() }
+
+const isOrderSelected = (row: PurchaseOrder) => tempSelectedOrder.value?.id === row.id
+const toggleOrderSelection = (row: PurchaseOrder) => {
+  tempSelectedOrder.value = isOrderSelected(row) ? null : row
+}
+
+const confirmOrderSelection = async () => {
+  if (!tempSelectedOrder.value) { ElMessage.warning('请选择一个订单'); return }
+  const order = tempSelectedOrder.value
+  await onOrderSelect(order)
+  orderDialogVisible.value = false
+}
+
+/* ==================== 供应商选择弹窗（独立选供应商用） ==================== */
+const supplierDialogVisible = ref(false)
+const supplierLoading = ref(false)
+const supplierList = ref<Supplier[]>([])
+const supplierTotal = ref(0)
+const supplierQuery = reactive({ pageNum: 1, pageSize: 10, keyword: '' })
+const tempSelectedSupplier = ref<Supplier | null>(null)
+
+const openSupplierDialog = () => {
+  tempSelectedSupplier.value = null
+  supplierQuery.pageNum = 1
+  supplierQuery.keyword = ''
+  loadSupplierList()
+  supplierDialogVisible.value = true
+}
+
+const loadSupplierList = async () => {
+  supplierLoading.value = true
+  try {
+    const result = await supplierApi.page({
+      pageNum: supplierQuery.pageNum,
+      pageSize: supplierQuery.pageSize,
+      keyword: supplierQuery.keyword || undefined,
+    } as any)
+    supplierList.value = result.records.map(toSupplier)
+    supplierTotal.value = result.total
+  } finally { supplierLoading.value = false }
+}
+
+const searchSupplier = () => { supplierQuery.pageNum = 1; loadSupplierList() }
+const resetSupplierQuery = () => { supplierQuery.keyword = ''; supplierQuery.pageNum = 1; loadSupplierList() }
+const onSupplierPageChange = () => { loadSupplierList() }
+const onSupplierPageSizeChange = () => { supplierQuery.pageNum = 1; loadSupplierList() }
+
+const isSupplierSelected = (row: Supplier) => tempSelectedSupplier.value?.id === row.id
+const toggleSupplierSelection = (row: Supplier) => {
+  tempSelectedSupplier.value = isSupplierSelected(row) ? null : row
+}
+
+const confirmSupplierSelection = () => {
+  if (!tempSelectedSupplier.value) { ElMessage.warning('请选择一个供应商'); return }
+  form.supplierId = Number(tempSelectedSupplier.value.id)
+  form.supplierName = tempSelectedSupplier.value.name
+  if (!form.noticeNo) generateNoticeNo()
+  supplierDialogVisible.value = false
+}
+
 const submit = async () => {
-  if (!form.orderId) {
-    ElMessage.warning('请先搜索并选择关联的采购订单')
-    return
-  }
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) return
   const validLines = deliveryLines.value.filter(l => l.orderLineNo > 0 && l.shipQty > 0)
   for (const line of validLines) {
     const orderLine = orderLineOptions.value.find(o => o.lineNo === line.orderLineNo)
@@ -90,29 +187,44 @@ const submit = async () => {
 </script>
 
 <template>
-  <PageContainer title="创建 ASN" subtitle="选择关联订单后，系统将自动回填订单与供应商信息">
+  <PageContainer title="创建 ASN" subtitle="选择关联订单后自动回填订单与供应商信息，支持手动修正">
     <template #actions>
       <el-button @click="router.push('/purchasing/asn')">返回列表</el-button>
     </template>
 
     <el-alert type="info" :closable="false" show-icon class="mb-4">
       <template #title>
-        请先搜索并选择一条采购订单，系统将自动回填订单号、供应商等信息
+        请点击"选择订单"从订单库中查找采购订单，系统将自动回填订单号、供应商、物料明细等信息
       </template>
     </el-alert>
 
-    <el-form :model="form" label-width="120px" style="max-width: 760px">
-      <el-form-item label="关联订单" required>
-        <OrderSelector v-model="form.orderId" @select="onOrderSelect" />
+    <el-form ref="formRef" :model="form" :rules="formRules" label-width="120px" style="max-width: 760px">
+      <el-form-item label="关联订单" prop="orderId">
+        <div class="select-area">
+          <el-button type="primary" @click="openOrderDialog">
+            <el-icon style="margin-right: 4px"><svg viewBox="0 0 1024 1024" width="1em" height="1em"><path d="M512 64a448 448 0 110 896 448 448 0 010-896z m0 64a384 384 0 100 768 384 384 0 000-768z m-42.667 213.333h85.334v170.667h170.666v85.333h-170.666v170.667h-85.334V597.333H298.667V512h170.666V341.333z" fill="currentColor"/></svg></el-icon>
+            选择订单
+          </el-button>
+          <el-tag v-if="form.orderNo" type="success" size="large" closable @close="selectedOrder = null; form.orderId = null; form.orderNo = ''; orderLineOptions = []">
+            {{ form.orderNo }} — {{ form.supplierName }}
+          </el-tag>
+          <span v-else class="select-hint">点击从订单库选择采购订单</span>
+        </div>
       </el-form-item>
 
       <template v-if="selectedOrder">
-        <el-divider content-position="left">已选订单信息（自动填入）</el-divider>
+        <el-divider content-position="left">已选订单信息（自动填入，可手动修正）</el-divider>
         <el-form-item label="订单号">
           <el-tag type="success">{{ selectedOrder.orderNo }}</el-tag>
         </el-form-item>
         <el-form-item label="供应商">
-          <el-tag type="success">{{ selectedOrder.supplierName }}</el-tag>
+          <div class="select-area">
+            <el-input v-model="form.supplierName" placeholder="供应商名称（自动填入）" style="flex: 1" />
+            <el-button type="warning" plain @click="openSupplierDialog" size="small">
+              <el-icon style="margin-right: 4px"><svg viewBox="0 0 1024 1024" width="1em" height="1em"><path d="M512 64a448 448 0 110 896 448 448 0 010-896z m0 64a384 384 0 100 768 384 384 0 000-768z m-42.667 213.333h85.334v170.667h170.666v85.333h-170.666v170.667h-85.334V597.333H298.667V512h170.666V341.333z" fill="currentColor"/></svg></el-icon>
+              更换供应商
+            </el-button>
+          </div>
         </el-form-item>
         <el-form-item label="订单状态">
           <el-tag :type="selectedOrder.confirmStatus === '已确认' || selectedOrder.confirmStatus === '部分发货' ? 'success' : 'warning'">
@@ -139,7 +251,7 @@ const submit = async () => {
 
       <el-row :gutter="16">
         <el-col :span="12">
-          <el-form-item label="计划送货日期" required>
+          <el-form-item label="计划送货日期" prop="planDeliveryDate">
             <el-date-picker v-model="form.planDeliveryDate" value-format="YYYY-MM-DD" style="width:100%" />
           </el-form-item>
         </el-col>
@@ -221,5 +333,116 @@ const submit = async () => {
         <el-button size="large" @click="router.push('/purchasing/asn')">取消</el-button>
       </el-form-item>
     </el-form>
+
+    <!-- 订单选择弹窗 -->
+    <el-dialog v-model="orderDialogVisible" title="选择采购订单" width="900px" :close-on-click-modal="false">
+      <div class="search-panel">
+        <el-form inline :model="orderQuery" @submit.prevent="searchOrder">
+          <el-form-item label="关键词">
+            <el-input v-model="orderQuery.keyword" placeholder="订单号/供应商名称" clearable @clear="resetOrderQuery" @keyup.enter="searchOrder" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="searchOrder">查询</el-button>
+            <el-button @click="resetOrderQuery">重置</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+      <el-table
+        v-loading="orderLoading"
+        :data="orderList"
+        border highlight-current-row
+        @row-click="toggleOrderSelection"
+        row-key="id" max-height="420"
+      >
+        <el-table-column width="55" align="center">
+          <template #default="{ row }">
+            <el-radio :model-value="isOrderSelected(row)" @click.stop />
+          </template>
+        </el-table-column>
+        <el-table-column prop="orderNo" label="订单号" width="160" />
+        <el-table-column prop="supplierName" label="供应商" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="amount" label="金额" width="120" />
+        <el-table-column prop="deliveryDate" label="要求交期" width="120" />
+        <el-table-column prop="confirmStatus" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.confirmStatus === '已确认' || row.confirmStatus === '部分发货' ? 'success' : 'warning'" size="small">
+              {{ row.confirmStatus || row.status }}
+            </el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-pagination
+        v-model:current-page="orderQuery.pageNum" v-model:page-size="orderQuery.pageSize"
+        :total="orderTotal" layout="total, prev, pager, next, sizes" class="mt-4"
+        @current-change="onOrderPageChange" @size-change="onOrderPageSizeChange"
+      />
+      <div class="dialog-selection-info">
+        <span v-if="tempSelectedOrder">
+          已选择: <strong>{{ tempSelectedOrder.orderNo }}</strong> — {{ tempSelectedOrder.supplierName }}
+        </span>
+        <span v-else class="no-selection">点击行选择一个采购订单</span>
+      </div>
+      <template #footer>
+        <el-button @click="orderDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmOrderSelection">确认选择</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 供应商选择弹窗 -->
+    <el-dialog v-model="supplierDialogVisible" title="选择供应商" width="860px" :close-on-click-modal="false">
+      <div class="search-panel">
+        <el-form inline :model="supplierQuery" @submit.prevent="searchSupplier">
+          <el-form-item label="关键词">
+            <el-input v-model="supplierQuery.keyword" placeholder="供应商名称/编码" clearable @clear="resetSupplierQuery" @keyup.enter="searchSupplier" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="searchSupplier">查询</el-button>
+            <el-button @click="resetSupplierQuery">重置</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+      <el-table
+        v-loading="supplierLoading"
+        :data="supplierList"
+        border highlight-current-row
+        @row-click="toggleSupplierSelection"
+        row-key="id" max-height="420"
+      >
+        <el-table-column width="55" align="center">
+          <template #default="{ row }">
+            <el-radio :model-value="isSupplierSelected(row)" @click.stop />
+          </template>
+        </el-table-column>
+        <el-table-column prop="code" label="供应商编码" width="140" />
+        <el-table-column prop="name" label="供应商名称" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="category" label="类别" width="120" />
+        <el-table-column prop="level" label="等级" width="100" />
+        <el-table-column prop="contact" label="联系人" width="100" />
+        <el-table-column prop="phone" label="电话" width="130" />
+      </el-table>
+      <el-pagination
+        v-model:current-page="supplierQuery.pageNum" v-model:page-size="supplierQuery.pageSize"
+        :total="supplierTotal" layout="total, prev, pager, next, sizes" class="mt-4"
+        @current-change="onSupplierPageChange" @size-change="onSupplierPageSizeChange"
+      />
+      <div class="dialog-selection-info">
+        <span v-if="tempSelectedSupplier">
+          已选择: <strong>{{ tempSelectedSupplier.name }}</strong>（{{ tempSelectedSupplier.code }}）
+        </span>
+        <span v-else class="no-selection">点击行选择一个供应商</span>
+      </div>
+      <template #footer>
+        <el-button @click="supplierDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmSupplierSelection">确认选择</el-button>
+      </template>
+    </el-dialog>
   </PageContainer>
 </template>
+
+<style scoped>
+.select-area { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
+.select-hint { color: #909399; font-size: 13px; }
+.search-panel { background: #ffffff; padding: 16px; border-radius: 12px; margin-bottom: 16px; }
+.dialog-selection-info { margin-top: 10px; font-size: 13px; color: #606266; }
+.dialog-selection-info .no-selection { color: #909399; }
+</style>

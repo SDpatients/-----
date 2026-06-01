@@ -17,4 +17,5 @@ public class SupplierQuery {
     private String keyword;
     private Integer status;
     private Integer supplierType;
+    private Boolean includeBlacklisted;
 }

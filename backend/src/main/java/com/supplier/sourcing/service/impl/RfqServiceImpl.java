@@ -2,6 +2,7 @@ package com.supplier.sourcing.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import cn.hutool.core.util.RandomUtil;
 import com.supplier.common.exception.BusinessException;
 import com.supplier.common.result.PageResult;
 import com.supplier.common.result.ResultCode;
@@ -16,10 +17,12 @@ import com.supplier.sourcing.dto.RfqUpdateDTO;
 import com.supplier.sourcing.entity.Quote;
 import com.supplier.sourcing.entity.QuoteAward;
 import com.supplier.sourcing.entity.Rfq;
+import com.supplier.sourcing.entity.RfqItem;
 import com.supplier.sourcing.enums.QuoteStatusEnum;
 import com.supplier.sourcing.enums.RfqStatusEnum;
 import com.supplier.sourcing.mapper.QuoteAwardMapper;
 import com.supplier.sourcing.mapper.QuoteMapper;
+import com.supplier.sourcing.mapper.RfqItemMapper;
 import com.supplier.sourcing.mapper.RfqMapper;
 import com.supplier.sourcing.query.RfqQuery;
 import com.supplier.sourcing.service.RfqService;
@@ -32,6 +35,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -39,6 +43,7 @@ import java.util.UUID;
 public class RfqServiceImpl implements RfqService {
 
     private final RfqMapper rfqMapper;
+    private final RfqItemMapper rfqItemMapper;
     private final QuoteMapper quoteMapper;
     private final QuoteAwardMapper quoteAwardMapper;
     private final PurchaseOrderService purchaseOrderService;
@@ -68,6 +73,11 @@ public class RfqServiceImpl implements RfqService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long create(RfqCreateDTO dto) {
+        String rfqNo = dto.getRfqNo();
+        if (!StringUtils.hasText(rfqNo)) {
+            rfqNo = generateRfqNo();
+            dto.setRfqNo(rfqNo);
+        }
         Long count = rfqMapper.selectCount(new LambdaQueryWrapper<Rfq>()
                 .eq(Rfq::getRfqNo, dto.getRfqNo()));
         if (count > 0) {
@@ -75,7 +85,38 @@ public class RfqServiceImpl implements RfqService {
         }
         Rfq entity = RfqConverter.toEntity(dto);
         rfqMapper.insert(entity);
-        return entity.getId();
+        Long rfqId = entity.getId();
+        saveLines(rfqId, dto.getLines());
+        return rfqId;
+    }
+
+    private void saveLines(Long rfqId, List<RfqCreateDTO.RfqLineDTO> lines) {
+        if (lines == null || lines.isEmpty()) {
+            return;
+        }
+        for (int i = 0; i < lines.size(); i++) {
+            RfqCreateDTO.RfqLineDTO dto = lines.get(i);
+            RfqItem item = new RfqItem();
+            item.setRfqId(rfqId);
+            item.setLineNo(dto.getLineNo() != null ? dto.getLineNo() : i + 1);
+            item.setMaterialCode(dto.getMaterialCode());
+            item.setMaterialName(dto.getMaterialName());
+            item.setMaterialSpec(dto.getSpec());
+            item.setUnit(dto.getUnit());
+            item.setQuantity(dto.getQuantity());
+            item.setTargetDeliveryDate(dto.getDeliveryDate());
+            item.setRemark(dto.getRemark());
+            rfqItemMapper.insert(item);
+        }
+    }
+
+    private String generateRfqNo() {
+        String no;
+        do {
+            no = "RFQ" + RandomUtil.randomNumbers(8);
+        } while (rfqMapper.selectCount(
+                new LambdaQueryWrapper<Rfq>().eq(Rfq::getRfqNo, no)) > 0);
+        return no;
     }
 
     @Override

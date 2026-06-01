@@ -37,4 +37,9 @@ public class SupplierVO {
     private String auditRemark;
     private String remark;
     private LocalDateTime createTime;
+
+    private Boolean blacklisted;
+    private String blacklistReason;
+    private LocalDateTime blacklistStartTime;
+    private LocalDateTime blacklistEndTime;
 }

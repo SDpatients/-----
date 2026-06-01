@@ -12,6 +12,14 @@ const props = withDefaults(defineProps<{
 
 const isPurchasing = props.mode === 'purchasing'
 
+const formRef = ref()
+const formRules = {
+  invoiceNo: [{ required: true, message: '发票号码不能为空', trigger: 'blur' }],
+  invoiceAmount: [{ required: true, message: '发票金额不能为空', trigger: 'blur' }],
+  invoiceDate: [{ required: true, message: '开票日期不能为空', trigger: 'change' }],
+  taxRate: [{ required: true, message: '税率不能为空', trigger: 'blur' }],
+}
+
 // ---- 列表 ----
 const loading = ref(false)
 const records = ref<any[]>([])
@@ -76,8 +84,8 @@ const fetchInvoicableAmount = async () => {
 }
 
 const submitCreate = async () => {
-  if (isPurchasing && !createForm.supplierId) { ElMessage.warning('请选择供应商'); return }
-  // 6.2.4 发票金额校验
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) return
   if (invoicableInfo.value) {
     const total = createForm.invoiceAmount + createForm.taxAmount
     if (total > invoicableInfo.value.invoicableAmount) {
@@ -166,6 +174,7 @@ const viewLinkedPayments = async (row: any) => {
 // ---- 采购方特有操作 ----
 const handleUpload = async (row: any) => {
   try {
+    await ElMessageBox.confirm(`确认上传发票「${row.invoiceNo}」？请确保已先通过文件上传接口获取fileId。`, '上传发票', { type: 'info' })
     await invoiceApi.upload(row.id, {} as any)
     ElMessage.success('发票上传成功')
     load()
@@ -210,7 +219,7 @@ const openVoidDialog = (row: any) => {
 const confirmVoid = async () => {
   if (!voidForm.voidReason) { ElMessage.warning('请输入作废原因'); return }
   try {
-    await invoiceApi.cancel(voidForm.id)
+    await invoiceApi.cancel(voidForm.id, { remark: voidForm.voidReason })
     ElMessage.success('发票已作废')
     showVoidDialog.value = false
     load()
@@ -303,11 +312,11 @@ const openVerifyDetail = (row: any) => {
           对账金额: &yen;{{ invoicableInfo.totalAmount.toLocaleString() }} | 已开票: &yen;{{ invoicableInfo.invoicedAmount.toLocaleString() }} | <strong>可开票: &yen;{{ invoicableInfo.invoicableAmount.toLocaleString() }}</strong>
         </template>
       </el-alert>
-      <el-form :model="createForm" label-width="100px">
-        <el-form-item label="发票号">
+      <el-form ref="formRef" :model="createForm" :rules="formRules" label-width="100px">
+        <el-form-item label="发票号" prop="invoiceNo">
           <el-input v-model="createForm.invoiceNo" :disabled="!isPurchasing" :placeholder="isPurchasing ? '请输入发票号' : ''" />
         </el-form-item>
-        <el-form-item v-if="isPurchasing" label="供应商" required>
+        <el-form-item v-if="isPurchasing" label="供应商" prop="supplierId">
           <SupplierSelector v-model="createForm.supplierId" @select="onSupplierSelect" />
         </el-form-item>
         <el-form-item v-if="isPurchasing" label="供应商名称">
@@ -316,13 +325,13 @@ const openVerifyDetail = (row: any) => {
         <el-form-item label="关联对账单">
           <el-input-number v-model="createForm.reconId" :min="1" placeholder="输入对账单ID" style="width:100%" @change="fetchInvoicableAmount" />
         </el-form-item>
-        <el-form-item label="发票金额" required>
+        <el-form-item label="发票金额" prop="invoiceAmount">
           <el-input-number v-model="createForm.invoiceAmount" :min="0" :precision="2" style="width:100%" />
         </el-form-item>
-        <el-form-item label="税额">
+        <el-form-item label="税额" prop="taxRate">
           <el-input-number v-model="createForm.taxAmount" :min="0" :precision="2" style="width:100%" />
         </el-form-item>
-        <el-form-item label="开票日期">
+        <el-form-item label="开票日期" prop="invoiceDate">
           <el-date-picker v-model="createForm.invoiceDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
         </el-form-item>
       </el-form>

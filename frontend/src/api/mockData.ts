@@ -111,7 +111,7 @@ export interface OrderDetailLine {
   lineNo: number
   materialCode: string
   materialName: string
-  spec: string
+  materialSpec: string
   unit: string
   quantity: number
   unitPrice: number
@@ -122,10 +122,10 @@ export interface OrderDetailLine {
 }
 
 export const orderDetails: OrderDetailLine[] = [
-  { id: 1, lineNo: 10, materialCode: 'MAT-001', materialName: '精密铸件A型', spec: '300x200x50mm', unit: '件', quantity: 500, unitPrice: 320, amount: 160000, deliveryDate: '2026-05-28', receivedQty: 0, remark: '' },
-  { id: 2, lineNo: 20, materialCode: 'MAT-002', materialName: '不锈钢法兰', spec: 'DN50 PN16', unit: '套', quantity: 200, unitPrice: 180, amount: 36000, deliveryDate: '2026-05-30', receivedQty: 50, remark: '急单' },
-  { id: 3, lineNo: 30, materialCode: 'MAT-003', materialName: '密封垫片', spec: 'Φ100x3mm', unit: '片', quantity: 1000, unitPrice: 45, amount: 45000, deliveryDate: '2026-06-05', receivedQty: 0, remark: '' },
-  { id: 4, lineNo: 40, materialCode: 'MAT-004', materialName: '紧固螺栓M16', spec: 'M16x80 8.8级', unit: '套', quantity: 2000, unitPrice: 22.5, amount: 45000, deliveryDate: '2026-06-02', receivedQty: 500, remark: '' },
+  { id: 1, lineNo: 10, materialCode: 'MAT-001', materialName: '精密铸件A型', materialSpec: '300x200x50mm', unit: '件', quantity: 500, unitPrice: 320, amount: 160000, deliveryDate: '2026-05-28', receivedQty: 0, remark: '' },
+  { id: 2, lineNo: 20, materialCode: 'MAT-002', materialName: '不锈钢法兰', materialSpec: 'DN50 PN16', unit: '套', quantity: 200, unitPrice: 180, amount: 36000, deliveryDate: '2026-05-30', receivedQty: 50, remark: '急单' },
+  { id: 3, lineNo: 30, materialCode: 'MAT-003', materialName: '密封垫片', materialSpec: 'Φ100x3mm', unit: '片', quantity: 1000, unitPrice: 45, amount: 45000, deliveryDate: '2026-06-05', receivedQty: 0, remark: '' },
+  { id: 4, lineNo: 40, materialCode: 'MAT-004', materialName: '紧固螺栓M16', materialSpec: 'M16x80 8.8级', unit: '套', quantity: 2000, unitPrice: 22.5, amount: 45000, deliveryDate: '2026-06-02', receivedQty: 500, remark: '' },
 ]
 
 /** 送货明细行 */

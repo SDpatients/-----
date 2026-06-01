@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 @TableName("receipt_record")
 public class ReceiptRecord extends BaseEntity {
+    private String receiptNo;
     private Long deliveryId;
     private Long noticeId;
     private Long supplierId;
@@ -27,6 +28,7 @@ public class ReceiptRecord extends BaseEntity {
     private String warehouseName;
     private String location;
     private Integer receiptStatus;
+    private String diffReason;
     private String rejectReason;
     private String remark;
 }

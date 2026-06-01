@@ -509,6 +509,7 @@ CREATE TABLE delivery_detail (
     qualified_qty       DECIMAL(18,4)   DEFAULT 0.0000           COMMENT '合格数量',
     batch_no            VARCHAR(50)     DEFAULT NULL             COMMENT '批次号',
     production_date     DATE            DEFAULT NULL             COMMENT '生产日期',
+    expiry_date         DATE            DEFAULT NULL             COMMENT '过期日期/有效期至',
     remark              VARCHAR(500)    DEFAULT NULL             COMMENT '备注',
     create_time         DATETIME        DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     create_by           BIGINT          DEFAULT NULL             COMMENT '创建人',

@@ -14,8 +14,8 @@ public class SupplierQualificationConverter {
         entity.setQualName(dto.getQualName());
         entity.setQualNo(dto.getQualNo());
         entity.setQualOrg(dto.getQualOrg());
-        entity.setValidStart(dto.getValidStart());
-        entity.setValidEnd(dto.getValidEnd());
+        entity.setValidStart(dto.getValidStart() != null ? dto.getValidStart().toLocalDate() : null);
+        entity.setValidEnd(dto.getValidEnd() != null ? dto.getValidEnd().toLocalDate() : null);
         entity.setFileId(dto.getFileId());
         entity.setRemindDays(dto.getRemindDays());
         entity.setRemark(dto.getRemark());
@@ -37,10 +37,10 @@ public class SupplierQualificationConverter {
             entity.setQualOrg(dto.getQualOrg());
         }
         if (dto.getValidStart() != null) {
-            entity.setValidStart(dto.getValidStart());
+            entity.setValidStart(dto.getValidStart().toLocalDate());
         }
         if (dto.getValidEnd() != null) {
-            entity.setValidEnd(dto.getValidEnd());
+            entity.setValidEnd(dto.getValidEnd().toLocalDate());
         }
         if (dto.getFileId() != null) {
             entity.setFileId(dto.getFileId());
@@ -64,8 +64,8 @@ public class SupplierQualificationConverter {
         vo.setQualName(entity.getQualName());
         vo.setQualNo(entity.getQualNo());
         vo.setQualOrg(entity.getQualOrg());
-        vo.setValidStart(entity.getValidStart());
-        vo.setValidEnd(entity.getValidEnd());
+        vo.setValidStart(entity.getValidStart() != null ? entity.getValidStart().atStartOfDay() : null);
+        vo.setValidEnd(entity.getValidEnd() != null ? entity.getValidEnd().atStartOfDay() : null);
         vo.setFileId(entity.getFileId());
         vo.setStatus(entity.getStatus());
         vo.setRemindDays(entity.getRemindDays());

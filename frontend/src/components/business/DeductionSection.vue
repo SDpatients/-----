@@ -12,6 +12,13 @@ const props = withDefaults(defineProps<{
 
 const isPurchasing = props.mode === 'purchasing'
 
+const formRef = ref()
+const formRules = {
+  deductionNo: [{ required: true, message: '扣款单号不能为空', trigger: 'blur' }],
+  supplierId: [{ required: true, message: '供应商不能为空', trigger: 'change' }],
+  deductionAmount: [{ required: true, message: '扣款金额不能为空', trigger: 'blur' }],
+}
+
 // 供应商名称缓存
 const supplierNames = ref<Record<number, string>>({})
 const ensureSupplierNames = async (ids: number[]) => {
@@ -63,19 +70,27 @@ const deductionTypeMap: Record<number, string> = { 1: '质量', 2: '延期', 3: 
 // ---- 创建扣款弹窗（仅采购方） ----
 const showCreate = ref(false)
 const createForm = reactive({
-  supplierId: null as number | null, deductionType: 1, deductionAmount: 0, deductionReason: '',
+  deductionNo: '', supplierId: null as number | null, sourceType: 'QUALITY', sourceId: null as number | null,
+  deductionType: 1, deductionAmount: 0, deductionReason: '', reconId: null as number | null,
 })
 
 const openCreate = () => {
+  createForm.deductionNo = `DK${Date.now()}`
   createForm.supplierId = null
+  createForm.sourceType = 'QUALITY'
+  createForm.sourceId = null
   createForm.deductionType = 1
   createForm.deductionAmount = 0
   createForm.deductionReason = ''
+  createForm.reconId = null
   showCreate.value = true
 }
 
 const submitCreate = async () => {
-  if (!createForm.supplierId) { ElMessage.warning('请选择供应商'); return }
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) return
+  if (!createForm.sourceType) { ElMessage.warning('请选择来源类型'); return }
+  if (!createForm.deductionReason) { ElMessage.warning('请填写扣款原因'); return }
   try {
     await deductionApi.create(createForm as any)
     ElMessage.success('扣款单创建成功')
@@ -102,7 +117,7 @@ const handleConfirm = async (row: any) => {
 
 const handleDispute = async (row: any) => {
   ElMessageBox.prompt('请输入异议原因', '提交异议', { type: 'warning', inputType: 'textarea' })
-    .then(({ value }) => deductionApi.dispute(row.id, { disputeReason: value || '' }))
+    .then(({ value }) => deductionApi.dispute(row.id, { remark: value || '' }))
     .then(() => { ElMessage.success('异议已提交'); load() })
     .catch(() => {})
 }
@@ -184,9 +199,23 @@ const handleBook = async (row: any) => {
 
     <!-- 创建扣款弹窗（仅采购方） -->
     <el-dialog v-if="isPurchasing" v-model="showCreate" title="创建扣款" width="550px" :close-on-click-modal="false">
-      <el-form :model="createForm" label-width="100px">
-        <el-form-item label="供应商" required>
+      <el-form ref="formRef" :model="createForm" :rules="formRules" label-width="100px">
+        <el-form-item label="扣款单号" prop="deductionNo">
+          <el-input v-model="createForm.deductionNo" placeholder="自动生成，可修改" />
+        </el-form-item>
+        <el-form-item label="供应商" prop="supplierId">
           <SupplierSelector v-model="createForm.supplierId" />
+        </el-form-item>
+        <el-form-item label="来源类型" required>
+          <el-select v-model="createForm.sourceType" style="width:100%">
+            <el-option label="质量" value="QUALITY" />
+            <el-option label="延期" value="DELIVERY" />
+            <el-option label="短交" value="SHORTAGE" />
+            <el-option label="其他" value="OTHER" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="来源ID">
+          <el-input-number v-model="createForm.sourceId" :min="1" placeholder="关联来源记录ID" style="width:100%" />
         </el-form-item>
         <el-form-item label="扣款类型">
           <el-select v-model="createForm.deductionType" style="width:100%">
@@ -196,11 +225,14 @@ const handleBook = async (row: any) => {
             <el-option label="其他" :value="4" />
           </el-select>
         </el-form-item>
-        <el-form-item label="扣款金额" required>
+        <el-form-item label="扣款金额" prop="deductionAmount">
           <el-input-number v-model="createForm.deductionAmount" :min="0" :precision="2" style="width:100%" />
         </el-form-item>
-        <el-form-item label="扣款原因">
+        <el-form-item label="扣款原因" required>
           <el-input v-model="createForm.deductionReason" type="textarea" :rows="3" placeholder="请输入扣款原因" />
+        </el-form-item>
+        <el-form-item label="对账单ID">
+          <el-input-number v-model="createForm.reconId" :min="1" placeholder="关联对账单ID（选填）" style="width:100%" />
         </el-form-item>
       </el-form>
       <template #footer>

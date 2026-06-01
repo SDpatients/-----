@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import StatusTag from './StatusTag.vue'
+import { notificationApi } from '@/api/notification'
 import type { PortalTodo } from '@/types/business'
 
 defineProps<{ todos: PortalTodo[] }>()
+const emit = defineEmits<{ refresh: [] }>()
 const router = useRouter()
 
 const resolvePath = (todo: PortalTodo): string => {
@@ -16,6 +19,22 @@ const resolvePath = (todo: PortalTodo): string => {
   }
   return map[todo.businessType] || `/messages?businessType=${todo.businessType}&businessId=${todo.businessId}`
 }
+
+const handleFinish = async (todo: PortalTodo) => {
+  try {
+    await notificationApi.finishTodo(todo.id)
+    ElMessage.success('待办已完成')
+    emit('refresh')
+  } catch { /* */ }
+}
+
+const handleIgnore = async (todo: PortalTodo) => {
+  try {
+    await notificationApi.ignoreTodo(todo.id)
+    ElMessage.success('待办已忽略')
+    emit('refresh')
+  } catch { /* */ }
+}
 </script>
 
 <template>
@@ -25,6 +44,12 @@ const resolvePath = (todo: PortalTodo): string => {
     <el-table-column label="优先级" width="110"><template #default="{ row }"><StatusTag :value="row.priority" kind="risk" /></template></el-table-column>
     <el-table-column prop="dueDate" label="截止日期" width="140" />
     <el-table-column label="状态" width="110"><template #default="{ row }"><StatusTag :value="row.status" /></template></el-table-column>
-    <el-table-column label="操作" width="120"><template #default="{ row }"><el-button link type="primary" @click="router.push(resolvePath(row))">处理</el-button></template></el-table-column>
+    <el-table-column label="操作" width="200">
+      <template #default="{ row }">
+        <el-button link type="primary" @click="router.push(resolvePath(row))">处理</el-button>
+        <el-button link type="success" @click="handleFinish(row)">完成</el-button>
+        <el-button link type="info" @click="handleIgnore(row)">忽略</el-button>
+      </template>
+    </el-table-column>
   </el-table>
 </template>

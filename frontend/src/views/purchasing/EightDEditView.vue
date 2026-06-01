@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { WarningFilled } from '@element-plus/icons-vue'
 import { eightDApi } from '@/api/qualityExtra'
+import type { EightDActionDTO } from '@/api/qualityExtra'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import type { EightDReport, EightDTimeline } from '@/types/business'
@@ -14,8 +15,12 @@ const loading = ref(false)
 const saving = ref(false)
 const report = ref<EightDReport | null>(null)
 const activeStep = ref(0)
+const formRef = ref()
+const formRules = {
+  d2Problem: [{ required: true, message: '问题描述不能为空', trigger: 'blur' }],
+  dueDate: [{ required: true, message: '截止日期不能为空', trigger: 'change' }],
+}
 
-/** D1-D8阶段定义 */
 const steps = [
   { key: 'd1Team', title: 'D1 团队组建', desc: '组建跨职能问题解决团队' },
   { key: 'd2Problem', title: 'D2 问题描述', desc: '明确描述问题，5W2H分析' },
@@ -57,22 +62,24 @@ const loadDetail = async () => {
       d8CloseSummary: detail.d8CloseSummary || '',
       dueDate: detail.dueDate || '',
     })
-    // 自动定位到第一个未填写的阶段
-    const idx = steps.findIndex((s) => !form[s.key as keyof FormData])
-    if (idx >= 0) activeStep.value = idx
+    if (detail.currentStep && detail.currentStep >= 1 && detail.currentStep <= 8) {
+      activeStep.value = detail.currentStep - 1
+    } else {
+      const idx = steps.findIndex((s) => !form[s.key as keyof FormData])
+      if (idx >= 0) activeStep.value = idx
+    }
   } finally { loading.value = false }
 }
 
 const currentField = computed(() => steps[activeStep.value].key)
+const currentStepNumber = computed(() => activeStep.value + 1)
 
-/** 构建时间线 */
 const buildTimeline = computed<EightDTimeline[]>(() => {
   if (!report.value) return []
   const r = report.value
   const stageKeys = ['d1Team', 'd2Problem', 'd3Containment', 'd4RootCause', 'd5CorrectiveAction', 'd6ValidateAction', 'd7PreventAction', 'd8CloseSummary'] as const
   const stageNames = ['D1-团队组建', 'D2-问题描述', 'D3-遏制措施', 'D4-根因分析', 'D5-纠正措施', 'D6-验证措施', 'D7-预防措施', 'D8-总结关闭']
 
-  // 进度决定: 0草稿→全部pending; 1-2已提交/审核中→按d1-d8正文是否填写判断
   const isClosed = r.reportStatus >= 4
   const now = new Date().toISOString().split('T')[0]
 
@@ -89,7 +96,6 @@ const buildTimeline = computed<EightDTimeline[]>(() => {
     } else {
       status = r.reportStatus >= 1 ? 'in_progress' : 'pending'
     }
-    // overdue check
     if (r.dueDate && r.dueDate < now && status !== 'completed') {
       status = 'overdue'
     }
@@ -118,10 +124,14 @@ const stageStatusTag = (status: EightDTimeline['status']) => {
 const saveCurrentStep = async () => {
   saving.value = true
   try {
-    await eightDApi.update(id.value, { [currentField.value]: form[currentField.value as keyof FormData] })
+    await eightDApi.update(id.value, {
+      [currentField.value]: form[currentField.value as keyof FormData],
+      currentStep: currentStepNumber.value,
+    })
     ElMessage.success(`${steps[activeStep.value].title} 已保存`)
     if (report.value) {
       (report.value as any)[currentField.value] = form[currentField.value as keyof FormData]
+      report.value.currentStep = currentStepNumber.value
     }
   } catch { /* handled */ }
   finally { saving.value = false }
@@ -130,19 +140,72 @@ const saveCurrentStep = async () => {
 const saveAll = async () => {
   saving.value = true
   try {
-    await eightDApi.update(id.value, { ...form })
+    await eightDApi.update(id.value, { ...form, currentStep: currentStepNumber.value })
     ElMessage.success('8D报告全部保存')
   } catch { /* handled */ }
   finally { saving.value = false }
 }
 
+const stepSubmit = async () => {
+  const fieldMap: Record<number, string[]> = { 0: ['dueDate'], 1: ['d2Problem'] }
+  const fields = fieldMap[activeStep.value]
+  if (fields) {
+    try { await formRef.value?.validateField(fields) } catch { return }
+  }
+  const content = form[currentField.value as keyof FormData]
+  if (!content) {
+    ElMessage.warning(`请先填写${steps[activeStep.value].title}的内容`)
+    return
+  }
+  try {
+    await ElMessageBox.confirm(`确认提交 ${steps[activeStep.value].title}？提交后将进入审核阶段`, '确认提交阶段', { type: 'info' })
+    const data: EightDActionDTO = {
+      currentStep: currentStepNumber.value,
+      stepContent: content,
+      remark: `提交${steps[activeStep.value].title}`,
+    }
+    await eightDApi.stepSubmit(id.value, data)
+    ElMessage.success(`${steps[activeStep.value].title} 已提交`)
+    loadDetail()
+  } catch { /* cancel */ }
+}
+
+const stepApprove = async () => {
+  try {
+    await ElMessageBox.confirm(`确认审核通过 ${steps[activeStep.value].title}，推进到下一阶段？`, '确认审核', { type: 'info' })
+    const data: EightDActionDTO = {
+      currentStep: currentStepNumber.value,
+      remark: `审核通过${steps[activeStep.value].title}`,
+    }
+    await eightDApi.stepApprove(id.value, data)
+    ElMessage.success(`${steps[activeStep.value].title} 审核通过，已推进到下一阶段`)
+    loadDetail()
+  } catch { /* cancel */ }
+}
+
 const handleSubmit = async () => {
   try {
     await ElMessageBox.confirm('提交后不可编辑，确认提交8D整改报告？', '确认提交', { type: 'info' })
-    await eightDApi.submit(id.value)
+    await eightDApi.submit(id.value, { remark: '提交8D整改报告' })
     ElMessage.success('8D报告已提交')
     loadDetail()
   } catch { /* cancel */ }
+}
+
+const uploadingAttachment = ref(false)
+const handleUploadAttachment = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  uploadingAttachment.value = true
+  try {
+    await eightDApi.uploadAttachment(id.value, file)
+    ElMessage.success('附件上传成功')
+  } catch { /* handled */ }
+  finally {
+    uploadingAttachment.value = false
+    input.value = ''
+  }
 }
 
 const nextStep = () => {
@@ -162,10 +225,13 @@ onMounted(loadDetail)
       <el-button @click="router.back()">返回</el-button>
       <el-button v-if="report?.reportStatus === 0" type="primary" @click="saveAll">全部保存</el-button>
       <el-button v-if="report?.reportStatus === 0" type="success" @click="handleSubmit">提交报告</el-button>
+      <el-button :loading="uploadingAttachment" @click="($refs.fileInput as HTMLInputElement)?.click()">
+        上传附件
+      </el-button>
+      <input ref="fileInput" type="file" style="display: none" @change="handleUploadAttachment" />
     </template>
 
     <el-row v-loading="loading" :gutter="24">
-      <!-- 左侧：阶段导航+表单 -->
       <el-col :span="16">
         <el-card>
           <el-steps :active="activeStep" finish-status="success" align-center style="margin-bottom: 24px">
@@ -178,93 +244,47 @@ onMounted(loadDetail)
               <p class="step-desc">{{ steps[activeStep].desc }}</p>
             </div>
 
-            <!-- D1 团队组建 -->
-            <el-input
-              v-if="activeStep === 0"
-              v-model="form.d1Team"
-              type="textarea"
-              :rows="6"
-              placeholder="列出跨职能团队成员：姓名、部门、角色。&#10;例如：&#10;组长：张三 - 质量部&#10;成员：李四 - 生产部、王五 - 技术部"
-            />
-
-            <!-- D2 问题描述 -->
-            <el-input
-              v-if="activeStep === 1"
-              v-model="form.d2Problem"
-              type="textarea"
-              :rows="8"
-              placeholder="使用5W2H方法描述问题：&#10;What - 什么问题？&#10;Who - 谁发现的？&#10;When - 何时发生？&#10;Where - 在哪里发生？&#10;Why - 为什么是问题？&#10;How - 如何发现的？&#10;How many - 影响范围？"
-            />
-
-            <!-- D3 遏制措施 -->
-            <el-input
-              v-if="activeStep === 2"
-              v-model="form.d3Containment"
-              type="textarea"
-              :rows="6"
-              placeholder="描述临时遏制措施：&#10;1. 隔离/标识不合格品&#10;2. 通知相关部门&#10;3. 临时检查方案&#10;4. 客户沟通（如涉及）"
-            />
-
-            <!-- D4 根因分析 -->
-            <el-input
-              v-if="activeStep === 3"
-              v-model="form.d4RootCause"
-              type="textarea"
-              :rows="8"
-              placeholder="使用鱼骨图/5Why等方法分析根本原因：&#10;1. 直接原因&#10;2. 根本原因&#10;3. 系统原因&#10;4. 验证方法"
-            />
-
-            <!-- D5 纠正措施 -->
-            <el-input
-              v-if="activeStep === 4"
-              v-model="form.d5CorrectiveAction"
-              type="textarea"
-              :rows="8"
-              placeholder="制定永久性纠正措施：&#10;1. 措施描述&#10;2. 责任部门/人&#10;3. 计划完成日期&#10;4. 所需资源"
-            />
-
-            <!-- D6 验证措施 -->
-            <el-input
-              v-if="activeStep === 5"
-              v-model="form.d6ValidateAction"
-              type="textarea"
-              :rows="8"
-              placeholder="验证纠正措施的有效性：&#10;1. 验证方法&#10;2. 验证数据&#10;3. 验证结论&#10;4. 是否需要调整措施"
-            />
-
-            <!-- D7 预防措施 -->
-            <el-input
-              v-if="activeStep === 6"
-              v-model="form.d7PreventAction"
-              type="textarea"
-              :rows="6"
-              placeholder="防止再发生的措施：&#10;1. FMEA更新&#10;2. 控制计划修订&#10;3. 作业指导书更新&#10;4. 培训计划&#10;5. 系统/流程变更"
-            />
-
-            <!-- D8 总结关闭 -->
-            <el-input
-              v-if="activeStep === 7"
-              v-model="form.d8CloseSummary"
-              type="textarea"
-              :rows="6"
-              placeholder="项目总结与关闭：&#10;1. 成果总结&#10;2. 经验教训&#10;3. 横向展开计划&#10;4. 团队表彰"
-            />
-
-            <!-- 截止日期（在D1阶段显示） -->
-            <el-form-item v-if="activeStep === 0" label="截止日期" style="margin-top: 16px">
-              <el-date-picker v-model="form.dueDate" type="date" placeholder="选择截止日期" value-format="YYYY-MM-DD" />
-            </el-form-item>
+            <el-form ref="formRef" :model="form" :rules="formRules">
+              <el-form-item v-if="activeStep === 0">
+                <el-input v-model="form.d1Team" type="textarea" :rows="6" placeholder="列出跨职能团队成员：姓名、部门、角色。&#10;例如：&#10;组长：张三 - 质量部&#10;成员：李四 - 生产部、王五 - 技术部" />
+              </el-form-item>
+              <el-form-item v-if="activeStep === 1" prop="d2Problem">
+                <el-input v-model="form.d2Problem" type="textarea" :rows="8" placeholder="使用5W2H方法描述问题：&#10;What - 什么问题？&#10;Who - 谁发现的？&#10;When - 何时发生？&#10;Where - 在哪里发生？&#10;Why - 为什么是问题？&#10;How - 如何发现的？&#10;How many - 影响范围？" />
+              </el-form-item>
+              <el-form-item v-if="activeStep === 2">
+                <el-input v-model="form.d3Containment" type="textarea" :rows="6" placeholder="描述临时遏制措施：&#10;1. 隔离/标识不合格品&#10;2. 通知相关部门&#10;3. 临时检查方案&#10;4. 客户沟通（如涉及）" />
+              </el-form-item>
+              <el-form-item v-if="activeStep === 3">
+                <el-input v-model="form.d4RootCause" type="textarea" :rows="8" placeholder="使用鱼骨图/5Why等方法分析根本原因：&#10;1. 直接原因&#10;2. 根本原因&#10;3. 系统原因&#10;4. 验证方法" />
+              </el-form-item>
+              <el-form-item v-if="activeStep === 4">
+                <el-input v-model="form.d5CorrectiveAction" type="textarea" :rows="8" placeholder="制定永久性纠正措施：&#10;1. 措施描述&#10;2. 责任部门/人&#10;3. 计划完成日期&#10;4. 所需资源" />
+              </el-form-item>
+              <el-form-item v-if="activeStep === 5">
+                <el-input v-model="form.d6ValidateAction" type="textarea" :rows="8" placeholder="验证纠正措施的有效性：&#10;1. 验证方法&#10;2. 验证数据&#10;3. 验证结论&#10;4. 是否需要调整措施" />
+              </el-form-item>
+              <el-form-item v-if="activeStep === 6">
+                <el-input v-model="form.d7PreventAction" type="textarea" :rows="6" placeholder="防止再发生的措施：&#10;1. FMEA更新&#10;2. 控制计划修订&#10;3. 作业指导书更新&#10;4. 培训计划&#10;5. 系统/流程变更" />
+              </el-form-item>
+              <el-form-item v-if="activeStep === 7">
+                <el-input v-model="form.d8CloseSummary" type="textarea" :rows="6" placeholder="项目总结与关闭：&#10;1. 成果总结&#10;2. 经验教训&#10;3. 横向展开计划&#10;4. 团队表彰" />
+              </el-form-item>
+              <el-form-item v-if="activeStep === 0" label="截止日期" prop="dueDate" style="margin-top: 16px">
+                <el-date-picker v-model="form.dueDate" type="date" placeholder="选择截止日期" value-format="YYYY-MM-DD" />
+              </el-form-item>
+            </el-form>
 
             <div class="step-actions">
               <el-button :disabled="activeStep === 0" @click="prevStep">上一步</el-button>
               <el-button v-if="report?.reportStatus === 0" type="primary" :loading="saving" @click="saveCurrentStep">保存当前</el-button>
+              <el-button v-if="report?.reportStatus === 0" type="warning" @click="stepSubmit">提交阶段</el-button>
+              <el-button v-if="report?.reportStatus === 1" type="success" @click="stepApprove">审核通过阶段</el-button>
               <el-button v-if="activeStep < steps.length - 1" type="primary" @click="nextStep">下一步</el-button>
             </div>
           </div>
         </el-card>
       </el-col>
 
-      <!-- 右侧：时间线 -->
       <el-col :span="8">
         <el-card>
           <template #header>

@@ -12,6 +12,14 @@ const props = withDefaults(defineProps<{
 
 const isPurchasing = props.mode === 'purchasing'
 
+const formRef = ref()
+const formRules = {
+  paymentNo: [{ required: true, message: '付款单号不能为空', trigger: 'blur' }],
+  supplierId: [{ required: true, message: '供应商不能为空', trigger: 'change' }],
+  paymentAmount: [{ required: true, message: '付款金额不能为空', trigger: 'blur' }],
+  scheduleDate: [{ required: true, message: '计划付款日期不能为空', trigger: 'change' }],
+}
+
 // ---- 列表 ----
 const loading = ref(false)
 const records = ref<any[]>([])
@@ -44,22 +52,27 @@ defineExpose({ load })
 // ---- 创建付款弹窗（仅采购方） ----
 const showCreate = ref(false)
 const createForm = reactive({
-  supplierId: null as number | null, invoiceId: null as number | null, invoiceNo: '',
+  paymentNo: '', supplierId: null as number | null, invoiceId: null as number | null, invoiceNo: '',
   paymentAmount: 0, paymentMethod: 1, paymentAccount: '',
+  scheduleDate: '', paymentTerms: '',
 })
 
 const openCreate = () => {
+  createForm.paymentNo = `FK${Date.now()}`
   createForm.supplierId = null
   createForm.invoiceId = null
   createForm.invoiceNo = ''
   createForm.paymentAmount = 0
   createForm.paymentMethod = 1
   createForm.paymentAccount = ''
+  createForm.scheduleDate = ''
+  createForm.paymentTerms = ''
   showCreate.value = true
 }
 
 const submitCreate = async () => {
-  if (!createForm.supplierId) { ElMessage.warning('请选择供应商'); return }
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) return
   try {
     await paymentApi.create(createForm as any)
     ElMessage.success('付款单创建成功')
@@ -81,6 +94,33 @@ const handleReject = async (row: any) => {
     .then(() => paymentApi.reject(row.id))
     .then(() => { ElMessage.success('已拒绝'); load() })
     .catch(() => {})
+}
+
+const handleSubmitApproval = async (row: any) => {
+  try {
+    await ElMessageBox.confirm(`确认提交付款单「${row.paymentNo}」审批？`, '提交审批', { type: 'info' })
+    await paymentApi.submitApproval(row.id)
+    ElMessage.success('已提交审批')
+    load()
+  } catch { /* */ }
+}
+
+const handleSchedule = async (row: any) => {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入计划付款日期（格式：YYYY-MM-DD）', '付款排期', { type: 'info', inputPattern: /^\d{4}-\d{2}-\d{2}$/, inputErrorMessage: '日期格式不正确，请使用 YYYY-MM-DD' })
+    await paymentApi.schedule(row.id, { scheduleDate: value })
+    ElMessage.success('排期成功')
+    load()
+  } catch { /* */ }
+}
+
+const handleCancel = async (row: any) => {
+  try {
+    await ElMessageBox.confirm(`确认取消付款单「${row.paymentNo}」？此操作不可撤回。`, '取消确认', { type: 'warning' })
+    await paymentApi.cancel(row.id)
+    ElMessage.success('付款单已取消')
+    load()
+  } catch { /* */ }
 }
 
 // ---- 6.2.5 付款回传状态时间线 ----
@@ -186,8 +226,11 @@ const viewDetail = (row: any) => { detailRow.value = row; detailVisible.value = 
           <template #default="{ row }">
             <!-- 采购方操作 -->
             <template v-if="isPurchasing">
+              <el-button v-if="row.paymentStatus === 0" link type="primary" @click="handleSubmitApproval(row)">提交审批</el-button>
+              <el-button v-if="row.paymentStatus === 0 || row.paymentStatus === 1" link type="success" @click="handleSchedule(row)">排期</el-button>
               <el-button v-if="row.paymentStatus === 0 || row.paymentStatus === 1" link type="success" @click="handlePay(row)">付款</el-button>
               <el-button v-if="row.paymentStatus === 0" link type="danger" @click="handleReject(row)">拒绝</el-button>
+              <el-button v-if="row.paymentStatus === 0" link type="warning" @click="handleCancel(row)">取消</el-button>
               <el-button link type="info" @click="viewLinkedInvoices(row)">关联发票</el-button>
             </template>
             <!-- 供应商操作 -->
@@ -207,8 +250,11 @@ const viewDetail = (row: any) => { detailRow.value = row; detailVisible.value = 
 
     <!-- 创建付款弹窗（仅采购方） -->
     <el-dialog v-if="isPurchasing" v-model="showCreate" title="创建付款" width="550px" :close-on-click-modal="false">
-      <el-form :model="createForm" label-width="100px">
-        <el-form-item label="供应商" required>
+      <el-form ref="formRef" :model="createForm" :rules="formRules" label-width="100px">
+        <el-form-item label="付款单号" prop="paymentNo">
+          <el-input v-model="createForm.paymentNo" placeholder="自动生成，可修改" />
+        </el-form-item>
+        <el-form-item label="供应商" prop="supplierId">
           <SupplierSelector v-model="createForm.supplierId" />
         </el-form-item>
         <el-form-item label="关联发票ID">
@@ -217,7 +263,7 @@ const viewDetail = (row: any) => { detailRow.value = row; detailVisible.value = 
         <el-form-item label="发票号">
           <el-input v-model="createForm.invoiceNo" placeholder="发票号" />
         </el-form-item>
-        <el-form-item label="付款金额" required>
+        <el-form-item label="付款金额" prop="paymentAmount">
           <el-input-number v-model="createForm.paymentAmount" :min="0" :precision="2" style="width:100%" />
         </el-form-item>
         <el-form-item label="付款方式">
@@ -229,6 +275,12 @@ const viewDetail = (row: any) => { detailRow.value = row; detailVisible.value = 
         </el-form-item>
         <el-form-item label="付款账户">
           <el-input v-model="createForm.paymentAccount" placeholder="付款账户" />
+        </el-form-item>
+        <el-form-item label="计划付款日期" prop="scheduleDate">
+          <el-date-picker v-model="createForm.scheduleDate" type="date" value-format="YYYY-MM-DD" style="width:100%" placeholder="选填" />
+        </el-form-item>
+        <el-form-item label="付款条件">
+          <el-input v-model="createForm.paymentTerms" placeholder="如：月结30天" />
         </el-form-item>
       </el-form>
       <template #footer>

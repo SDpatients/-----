@@ -30,6 +30,8 @@ public class PaymentCreateDTO {
     private String paymentBank;
     private String receiveAccount;
     private String receiveBank;
+
+    @NotNull(message = "计划付款日期不能为空")
     private LocalDate scheduleDate;
     private String paymentTerms;
     private String remark;

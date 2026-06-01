@@ -32,7 +32,7 @@ const { lastRefreshAt } = useDashboardRefresh(loadDashboard, 60)
     <DashboardMetricGrid :metrics="metrics" />
     <div class="dashboard-grid">
       <PageContainer title="待办中心" :subtitle="`聚合采购方内部待处理事项，最后刷新：${lastRefreshAt}`">
-        <TodoList :todos="todos" />
+        <TodoList :todos="todos" @refresh="loadDashboard" />
       </PageContainer>
       <PageContainer title="风险预警" subtitle="基于真实交付、质量、对账数据驱动的业务风险">
         <RiskWarningList :risks="risks" />

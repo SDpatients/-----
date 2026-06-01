@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
-import { vmiApi, forecastApi } from '@/api/inventory'
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { vmiApi, forecastApi, type VmiInventoryQuery, type VmiInventorySyncDTO } from '@/api/inventory'
 import { supplierApi } from '@/api/supplier'
+import { materialApi } from '@/api/material'
+import { toSupplier } from '@/api/adapters'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
-import SupplierSelector from '@/components/business/SupplierSelector.vue'
+import type { Supplier } from '@/types/business'
 
-// ---- tab 控制 ----
 const activeTab = ref('vmi')
 
 watch(activeTab, () => {
@@ -15,7 +16,7 @@ watch(activeTab, () => {
   else if (activeTab.value === 'forecast') loadForecasts()
 })
 
-// 供应商名称缓存
+/* ==================== 供应商名称缓存 ==================== */
 const supplierNames = ref<Record<number, string>>({})
 const ensureSupplierNames = async (ids: number[]) => {
   const unseen = ids.filter(id => id && !supplierNames.value[id])
@@ -31,18 +32,16 @@ const ensureSupplierNames = async (ids: number[]) => {
 }
 const getSupplierName = (id: number) => supplierNames.value[id] || String(id)
 
-// ==================== VMI库存 ====================
+/* ==================== VMI库存 ==================== */
 const vmiLoading = ref(false)
 const vmiRecords = ref<any[]>([])
 const vmiTotal = ref(0)
-const vmiQuery = reactive({ pageNum: 1, pageSize: 10, keyword: '' })
+const vmiQuery = reactive<VmiInventoryQuery>({ pageNum: 1, pageSize: 10, keyword: '' })
 
 const loadVmi = async () => {
   vmiLoading.value = true
   try {
-    const params: Record<string, unknown> = { pageNum: vmiQuery.pageNum, pageSize: vmiQuery.pageSize }
-    if (vmiQuery.keyword) params.keyword = vmiQuery.keyword
-    const res = await vmiApi.page(params)
+    const res = await vmiApi.page(vmiQuery)
     vmiRecords.value = res.records
     vmiTotal.value = res.total
     if (res.total === 0) vmiQuery.pageNum = 1
@@ -55,38 +54,146 @@ const resetVmiQuery = () => {
   loadVmi()
 }
 
-// 同步库存弹窗
+/* ==================== 供应商选择弹窗（单选用） ==================== */
+const supplierDialogVisible = ref(false)
+const supplierLoading = ref(false)
+const supplierList = ref<Supplier[]>([])
+const supplierTotal = ref(0)
+const supplierQuery = reactive({ pageNum: 1, pageSize: 10, keyword: '' })
+const tempSelectedSupplier = ref<Supplier | null>(null)
+type SupplierDialogTarget = 'sync' | 'forecast'
+let supplierTarget: SupplierDialogTarget = 'sync'
+
+const openSupplierDialog = (target: SupplierDialogTarget) => {
+  supplierTarget = target
+  tempSelectedSupplier.value = null
+  supplierQuery.pageNum = 1
+  supplierQuery.keyword = ''
+  loadSupplierList()
+  supplierDialogVisible.value = true
+}
+
+const loadSupplierList = async () => {
+  supplierLoading.value = true
+  try {
+    const result = await supplierApi.page({
+      pageNum: supplierQuery.pageNum,
+      pageSize: supplierQuery.pageSize,
+      keyword: supplierQuery.keyword || undefined,
+    } as any)
+    supplierList.value = result.records.map(toSupplier)
+    supplierTotal.value = result.total
+  } finally { supplierLoading.value = false }
+}
+
+const searchSupplier = () => { supplierQuery.pageNum = 1; loadSupplierList() }
+const resetSupplierQuery = () => { supplierQuery.keyword = ''; supplierQuery.pageNum = 1; loadSupplierList() }
+const onSupplierPageChange = () => { loadSupplierList() }
+const onSupplierPageSizeChange = () => { supplierQuery.pageNum = 1; loadSupplierList() }
+
+const isSupplierSelected = (row: Supplier) => tempSelectedSupplier.value?.id === row.id
+const toggleSupplierSelection = (row: Supplier) => {
+  tempSelectedSupplier.value = isSupplierSelected(row) ? null : row
+}
+
+const confirmSupplierSelection = () => {
+  if (!tempSelectedSupplier.value) { ElMessage.warning('请选择一个供应商'); return }
+  if (supplierTarget === 'sync') {
+    syncForm.supplierId = Number(tempSelectedSupplier.value.id)
+  } else {
+    forecastCreateForm.supplierId = Number(tempSelectedSupplier.value.id)
+  }
+  supplierDialogVisible.value = false
+}
+
+/* ==================== 物料选择弹窗（单选用） ==================== */
+const materialDialogVisible = ref(false)
+const materialLoading = ref(false)
+const materialList = ref<any[]>([])
+const materialTotal = ref(0)
+const materialQuery = reactive({ pageNum: 1, pageSize: 10, keyword: '' })
+const tempSelectedMaterial = ref<any>(null)
+type MaterialDialogTarget = 'sync' | 'forecast'
+let materialTarget: MaterialDialogTarget = 'sync'
+
+const openMaterialDialog = (target: MaterialDialogTarget) => {
+  materialTarget = target
+  tempSelectedMaterial.value = null
+  materialQuery.pageNum = 1
+  materialQuery.keyword = ''
+  loadMaterialList()
+  materialDialogVisible.value = true
+}
+
+const loadMaterialList = async () => {
+  materialLoading.value = true
+  try {
+    const result = await materialApi.page({
+      pageNum: materialQuery.pageNum,
+      pageSize: materialQuery.pageSize,
+      keyword: materialQuery.keyword || undefined,
+    })
+    materialList.value = result.records
+    materialTotal.value = result.total
+  } finally { materialLoading.value = false }
+}
+
+const searchMaterial = () => { materialQuery.pageNum = 1; loadMaterialList() }
+const resetMaterialQuery = () => { materialQuery.keyword = ''; materialQuery.pageNum = 1; loadMaterialList() }
+const onMaterialPageChange = () => { loadMaterialList() }
+const onMaterialPageSizeChange = () => { materialQuery.pageNum = 1; loadMaterialList() }
+
+const isMaterialSelected = (row: any) => tempSelectedMaterial.value?.id === row.id
+const toggleMaterialSelection = (row: any) => {
+  tempSelectedMaterial.value = isMaterialSelected(row) ? null : row
+}
+
+const confirmMaterialSelection = () => {
+  if (!tempSelectedMaterial.value) { ElMessage.warning('请选择一个物料'); return }
+  if (materialTarget === 'sync') {
+    syncForm.materialCode = tempSelectedMaterial.value.code || ''
+  } else {
+    forecastCreateForm.materialCode = tempSelectedMaterial.value.code || ''
+  }
+  materialDialogVisible.value = false
+}
+
+/* ==================== 同步库存弹窗 ==================== */
+const syncFormRef = ref<FormInstance>()
+const syncFormRules: FormRules = {
+  supplierId: [{ required: true, message: '请选择供应商', trigger: 'change' }],
+  materialCode: [{ required: true, message: '物料编码不能为空', trigger: 'blur' }],
+}
 const showSyncDialog = ref(false)
-const syncForm = reactive({
-  supplierId: null as number | null, materialCode: '',
-  warehouseId: null as number | null, warehouseName: '',
-  onhandQty: 0, availableQty: 0, safetyQty: 0, maxQty: 0,
+const syncForm = reactive<VmiInventorySyncDTO>({
+  supplierId: 0, materialCode: '',
+  warehouseId: undefined, warehouseName: undefined,
+  onhandQty: 0, availableQty: 0, safetyQty: undefined, maxQty: undefined,
 })
 
 const openSyncDialog = () => {
-  syncForm.supplierId = null
+  syncForm.supplierId = 0
   syncForm.materialCode = ''
-  syncForm.warehouseId = null
-  syncForm.warehouseName = ''
+  syncForm.warehouseId = undefined
+  syncForm.warehouseName = undefined
   syncForm.onhandQty = 0
   syncForm.availableQty = 0
-  syncForm.safetyQty = 0
-  syncForm.maxQty = 0
+  syncForm.safetyQty = undefined
+  syncForm.maxQty = undefined
   showSyncDialog.value = true
 }
 
 const submitSync = async () => {
-  if (!syncForm.supplierId) { ElMessage.warning('请选择供应商'); return }
-  if (!syncForm.materialCode) { ElMessage.warning('请填写物料编码'); return }
+  if (!await syncFormRef.value?.validate()) return
   try {
-    await vmiApi.sync(syncForm as any)
+    await vmiApi.sync(syncForm)
     ElMessage.success('库存同步成功')
     showSyncDialog.value = false
     loadVmi()
   } catch { /* */ }
 }
 
-// ==================== 需求预测 ====================
+/* ==================== 需求预测 ==================== */
 const forecastLoading = ref(false)
 const forecastRecords = ref<any[]>([])
 const forecastTotal = ref(0)
@@ -112,7 +219,13 @@ const resetForecastQuery = () => {
 
 const demandTypeMap: Record<number, string> = { 1: '预测', 2: 'JIT', 3: 'VMI补货' }
 
-// 创建预测弹窗
+const forecastFormRef = ref<FormInstance>()
+const forecastFormRules: FormRules = {
+  supplierId: [{ required: true, message: '请选择供应商', trigger: 'change' }],
+  materialCode: [{ required: true, message: '物料编码不能为空', trigger: 'blur' }],
+  demandDate: [{ required: true, message: '需求日期不能为空', trigger: 'change' }],
+  demandQty: [{ required: true, message: '需求数量不能为空', trigger: 'blur' }],
+}
 const showForecastCreate = ref(false)
 const forecastCreateForm = reactive({
   supplierId: null as number | null, materialCode: '',
@@ -129,7 +242,7 @@ const openForecastCreate = () => {
 }
 
 const submitForecastCreate = async () => {
-  if (!forecastCreateForm.supplierId) { ElMessage.warning('请选择供应商'); return }
+  if (!await forecastFormRef.value?.validate()) return
   try {
     await forecastApi.create(forecastCreateForm as any)
     ElMessage.success('需求预测创建成功')
@@ -139,27 +252,13 @@ const submitForecastCreate = async () => {
 }
 
 const handlePublish = async (row: any) => {
-  try {
-    await forecastApi.publish(row.id)
-    ElMessage.success('已发布')
-    loadForecasts()
-  } catch { /* */ }
+  try { await forecastApi.publish(row.id); ElMessage.success('已发布'); loadForecasts() } catch { /* */ }
 }
-
 const handleRespond = async (row: any) => {
-  try {
-    await forecastApi.respond(row.id)
-    ElMessage.success('已响应')
-    loadForecasts()
-  } catch { /* */ }
+  try { await forecastApi.respond(row.id); ElMessage.success('已响应'); loadForecasts() } catch { /* */ }
 }
-
 const handleClose = async (row: any) => {
-  try {
-    await forecastApi.close(row.id)
-    ElMessage.success('已关闭')
-    loadForecasts()
-  } catch { /* */ }
+  try { await forecastApi.close(row.id); ElMessage.success('已关闭'); loadForecasts() } catch { /* */ }
 }
 
 onMounted(loadVmi)
@@ -168,7 +267,6 @@ onMounted(loadVmi)
 <template>
   <PageContainer title="VMI库存与需求预测" subtitle="VMI库存监控与需求预测管理">
     <el-tabs v-model="activeTab" type="border-card">
-      <!-- ========== VMI库存 Tab ========== -->
       <el-tab-pane name="vmi">
         <template #label>
           <span class="tab-label">VMI库存</span>
@@ -211,7 +309,6 @@ onMounted(loadVmi)
         </div>
       </el-tab-pane>
 
-      <!-- ========== 需求预测 Tab ========== -->
       <el-tab-pane name="forecast">
         <template #label>
           <span class="tab-label">需求预测</span>
@@ -264,12 +361,26 @@ onMounted(loadVmi)
 
     <!-- VMI库存同步弹窗 -->
     <el-dialog v-model="showSyncDialog" title="同步库存" width="550px" :close-on-click-modal="false">
-      <el-form :model="syncForm" label-width="100px">
-        <el-form-item label="供应商" required>
-          <SupplierSelector v-model="syncForm.supplierId" />
+      <el-form ref="syncFormRef" :model="syncForm" :rules="syncFormRules" label-width="100px">
+        <el-form-item label="供应商" prop="supplierId">
+          <div class="select-area">
+            <el-button type="primary" plain @click="openSupplierDialog('sync')">
+              <el-icon style="margin-right: 4px"><svg viewBox="0 0 1024 1024" width="1em" height="1em"><path d="M512 64a448 448 0 110 896 448 448 0 010-896z m0 64a384 384 0 100 768 384 384 0 000-768z m-42.667 213.333h85.334v170.667h170.666v85.333h-170.666v170.667h-85.334V597.333H298.667V512h170.666V341.333z" fill="currentColor"/></svg></el-icon>
+              选择供应商
+            </el-button>
+            <span v-if="!syncForm.supplierId" class="select-hint">点击从供应商库选择</span>
+            <el-tag v-else type="success" closable @close="syncForm.supplierId = null">已选</el-tag>
+          </div>
         </el-form-item>
-        <el-form-item label="物料编码" required>
-          <el-input v-model="syncForm.materialCode" placeholder="请输入物料编码" />
+        <el-form-item label="物料" prop="materialCode">
+          <div class="select-area">
+            <el-button type="success" plain @click="openMaterialDialog('sync')">
+              <el-icon style="margin-right: 4px"><svg viewBox="0 0 1024 1024" width="1em" height="1em"><path d="M512 64a448 448 0 110 896 448 448 0 010-896z m0 64a384 384 0 100 768 384 384 0 000-768z m-42.667 213.333h85.334v170.667h170.666v85.333h-170.666v170.667h-85.334V597.333H298.667V512h170.666V341.333z" fill="currentColor"/></svg></el-icon>
+              选择物料
+            </el-button>
+            <span v-if="!syncForm.materialCode" class="select-hint">点击从物料库选择</span>
+            <el-tag v-else type="success" closable @close="syncForm.materialCode = ''">{{ syncForm.materialCode }}</el-tag>
+          </div>
         </el-form-item>
         <el-form-item label="仓库ID">
           <el-input-number v-model="syncForm.warehouseId" :min="1" style="width:100%" />
@@ -310,17 +421,31 @@ onMounted(loadVmi)
 
     <!-- 创建需求预测弹窗 -->
     <el-dialog v-model="showForecastCreate" title="创建需求预测" width="550px" :close-on-click-modal="false">
-      <el-form :model="forecastCreateForm" label-width="100px">
-        <el-form-item label="供应商" required>
-          <SupplierSelector v-model="forecastCreateForm.supplierId" />
+      <el-form ref="forecastFormRef" :model="forecastCreateForm" :rules="forecastFormRules" label-width="100px">
+        <el-form-item label="供应商" prop="supplierId">
+          <div class="select-area">
+            <el-button type="primary" plain @click="openSupplierDialog('forecast')">
+              <el-icon style="margin-right: 4px"><svg viewBox="0 0 1024 1024" width="1em" height="1em"><path d="M512 64a448 448 0 110 896 448 448 0 010-896z m0 64a384 384 0 100 768 384 384 0 000-768z m-42.667 213.333h85.334v170.667h170.666v85.333h-170.666v170.667h-85.334V597.333H298.667V512h170.666V341.333z" fill="currentColor"/></svg></el-icon>
+              选择供应商
+            </el-button>
+            <span v-if="!forecastCreateForm.supplierId" class="select-hint">点击从供应商库选择</span>
+            <el-tag v-else type="success" closable @close="forecastCreateForm.supplierId = null">已选</el-tag>
+          </div>
         </el-form-item>
-        <el-form-item label="物料编码" required>
-          <el-input v-model="forecastCreateForm.materialCode" placeholder="物料编码" />
+        <el-form-item label="物料" prop="materialCode">
+          <div class="select-area">
+            <el-button type="success" plain @click="openMaterialDialog('forecast')">
+              <el-icon style="margin-right: 4px"><svg viewBox="0 0 1024 1024" width="1em" height="1em"><path d="M512 64a448 448 0 110 896 448 448 0 010-896z m0 64a384 384 0 100 768 384 384 0 000-768z m-42.667 213.333h85.334v170.667h170.666v85.333h-170.666v170.667h-85.334V597.333H298.667V512h170.666V341.333z" fill="currentColor"/></svg></el-icon>
+              选择物料
+            </el-button>
+            <span v-if="!forecastCreateForm.materialCode" class="select-hint">点击从物料库选择</span>
+            <el-tag v-else type="success" closable @close="forecastCreateForm.materialCode = ''">{{ forecastCreateForm.materialCode }}</el-tag>
+          </div>
         </el-form-item>
-        <el-form-item label="需求日期">
+        <el-form-item label="需求日期" prop="demandDate">
           <el-date-picker v-model="forecastCreateForm.demandDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />
         </el-form-item>
-        <el-form-item label="需求数量">
+        <el-form-item label="需求数量" prop="demandQty">
           <el-input-number v-model="forecastCreateForm.demandQty" :min="0" style="width:100%" />
         </el-form-item>
         <el-form-item label="需求类型">
@@ -336,26 +461,112 @@ onMounted(loadVmi)
         <el-button type="primary" @click="submitForecastCreate">确认</el-button>
       </template>
     </el-dialog>
+
+    <!-- 供应商选择弹窗 -->
+    <el-dialog v-model="supplierDialogVisible" title="选择供应商" width="860px" :close-on-click-modal="false">
+      <div class="search-panel">
+        <el-form inline :model="supplierQuery" @submit.prevent="searchSupplier">
+          <el-form-item label="关键词">
+            <el-input v-model="supplierQuery.keyword" placeholder="供应商名称/编码" clearable @clear="resetSupplierQuery" @keyup.enter="searchSupplier" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="searchSupplier">查询</el-button>
+            <el-button @click="resetSupplierQuery">重置</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+      <el-table
+        v-loading="supplierLoading"
+        :data="supplierList"
+        border highlight-current-row
+        @row-click="toggleSupplierSelection"
+        row-key="id" max-height="420"
+      >
+        <el-table-column width="55" align="center">
+          <template #default="{ row }">
+            <el-radio :model-value="isSupplierSelected(row)" @click.stop />
+          </template>
+        </el-table-column>
+        <el-table-column prop="code" label="供应商编码" width="140" />
+        <el-table-column prop="name" label="供应商名称" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="category" label="类别" width="120" />
+        <el-table-column prop="level" label="等级" width="100" />
+        <el-table-column prop="contact" label="联系人" width="100" />
+        <el-table-column prop="phone" label="电话" width="130" />
+      </el-table>
+      <el-pagination
+        v-model:current-page="supplierQuery.pageNum" v-model:page-size="supplierQuery.pageSize"
+        :total="supplierTotal" layout="total, prev, pager, next, sizes" class="mt-4"
+        @current-change="onSupplierPageChange" @size-change="onSupplierPageSizeChange"
+      />
+      <div class="dialog-selection-info">
+        <span v-if="tempSelectedSupplier">
+          已选择: <strong>{{ tempSelectedSupplier.name }}</strong>（{{ tempSelectedSupplier.code }}）
+        </span>
+        <span v-else class="no-selection">点击行选择一个供应商</span>
+      </div>
+      <template #footer>
+        <el-button @click="supplierDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmSupplierSelection">确认选择</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 物料选择弹窗 -->
+    <el-dialog v-model="materialDialogVisible" title="从物料库选择物料" width="860px" :close-on-click-modal="false">
+      <div class="search-panel">
+        <el-form inline :model="materialQuery" @submit.prevent="searchMaterial">
+          <el-form-item label="关键词">
+            <el-input v-model="materialQuery.keyword" placeholder="物料编码/名称" clearable @clear="resetMaterialQuery" @keyup.enter="searchMaterial" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="searchMaterial">查询</el-button>
+            <el-button @click="resetMaterialQuery">重置</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+      <el-table
+        v-loading="materialLoading"
+        :data="materialList"
+        border highlight-current-row
+        @row-click="toggleMaterialSelection"
+        row-key="id" max-height="420"
+      >
+        <el-table-column width="55" align="center">
+          <template #default="{ row }">
+            <el-radio :model-value="isMaterialSelected(row)" @click.stop />
+          </template>
+        </el-table-column>
+        <el-table-column prop="code" label="物料编码" width="140" />
+        <el-table-column prop="name" label="物料名称" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="spec" label="规格" width="130" show-overflow-tooltip />
+        <el-table-column prop="unit" label="单位" width="80" />
+        <el-table-column prop="category" label="分类" width="120" show-overflow-tooltip />
+      </el-table>
+      <el-pagination
+        v-model:current-page="materialQuery.pageNum" v-model:page-size="materialQuery.pageSize"
+        :total="materialTotal" layout="total, prev, pager, next, sizes" class="mt-4"
+        @current-change="onMaterialPageChange" @size-change="onMaterialPageSizeChange"
+      />
+      <div class="dialog-selection-info">
+        <span v-if="tempSelectedMaterial">
+          已选择: <strong>{{ tempSelectedMaterial.name }}</strong>（{{ tempSelectedMaterial.code }}）
+        </span>
+        <span v-else class="no-selection">点击行选择一个物料</span>
+      </div>
+      <template #footer>
+        <el-button @click="materialDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmMaterialSelection">确认选择</el-button>
+      </template>
+    </el-dialog>
   </PageContainer>
 </template>
 
 <style scoped>
-.tab-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.search-panel {
-  background: #ffffff;
-  padding: 16px;
-  border-radius: 12px;
-  margin-bottom: 16px;
-}
-
-.card-table {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 16px;
-}
+.tab-label { display: flex; align-items: center; gap: 6px; }
+.search-panel { background: #ffffff; padding: 16px; border-radius: 12px; margin-bottom: 16px; }
+.card-table { background: #ffffff; border-radius: 12px; padding: 16px; }
+.select-area { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
+.select-hint { color: #909399; font-size: 13px; }
+.dialog-selection-info { margin-top: 10px; font-size: 13px; color: #606266; }
+.dialog-selection-info .no-selection { color: #909399; }
 </style>

@@ -6,11 +6,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -74,6 +77,51 @@ public class GlobalExceptionHandler {
     public Result<Void> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e) {
         log.warn("参数类型错误: {}", e.getName());
         return Result.error(ResultCode.PARAM_ERROR.getCode(), "参数类型错误: " + e.getName());
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
+        log.warn("请求体解析失败: {}", e.getMessage());
+        String message = "请求体格式错误，请检查JSON数据格式和字段类型";
+        Throwable cause = e.getCause();
+        if (cause != null) {
+            String causeMsg = cause.getMessage();
+            if (causeMsg != null) {
+                if (causeMsg.contains("BigDecimal") || causeMsg.contains("Date") || causeMsg.contains("Integer") || causeMsg.contains("Long")) {
+                    message = "请求参数类型错误: " + causeMsg;
+                } else if (causeMsg.contains("not a valid") || causeMsg.contains("Cannot deserialize")) {
+                    message = "请求参数格式不正确";
+                }
+            }
+        }
+        return Result.error(ResultCode.PARAM_ERROR.getCode(), message);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    @ResponseStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+    public Result<Void> handleHttpMediaTypeNotSupportedException(HttpMediaTypeNotSupportedException e) {
+        log.warn("不支持的Content-Type: {}", e.getContentType());
+        return Result.error(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value(), "不支持的Content-Type，请使用application/json");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleDataIntegrityViolationException(DataIntegrityViolationException e) {
+        log.warn("数据完整性约束违反: {}", e.getMessage());
+        String message = "数据完整性校验失败";
+        Throwable cause = e.getMostSpecificCause();
+        if (cause != null && cause.getMessage() != null) {
+            String causeMsg = cause.getMessage();
+            if (causeMsg.contains("Duplicate entry") || causeMsg.contains("唯一约束")) {
+                message = "数据重复，该记录已存在";
+            } else if (causeMsg.contains("Data too long") || causeMsg.contains("VARCHAR") || causeMsg.contains("value too long")) {
+                message = "字段值超出长度限制";
+            } else if (causeMsg.contains("NULL") || causeMsg.contains("not-null")) {
+                message = "必填字段不能为空: " + causeMsg;
+            }
+        }
+        return Result.error(ResultCode.PARAM_ERROR.getCode(), message);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

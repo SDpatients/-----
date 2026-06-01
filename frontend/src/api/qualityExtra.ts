@@ -2,6 +2,17 @@ import { request, type ApiPage } from '@/utils/request'
 import { asPage } from '@/utils/apiNormalize'
 import type { PageQuery, NcrRecord, EightDReport, QualityAppeal } from '@/types/business'
 
+export interface EightDActionDTO {
+  remark?: string
+  currentStep?: number
+  stepDueDate?: string
+  stepContent?: string
+}
+
+export interface QualityAppealAuditDTO {
+  auditRemark: string
+}
+
 export const ncrApi = {
   page: async (params: PageQuery) =>
     asPage<NcrRecord>(await request.get<ApiPage<NcrRecord>, ApiPage<NcrRecord>>('/v1/nonconformance-reports', { params }), params.pageNum, params.pageSize),
@@ -12,7 +23,6 @@ export const ncrApi = {
 
   submit: (id: number | string) => request.post<void, void>(`/v1/nonconformance-reports/${id}/submit`),
 
-  /** 处理NCR */
   handle: (id: number | string, data: Record<string, unknown>) =>
     request.post<void, void>(`/v1/nonconformance-reports/${id}/handle`, data),
 
@@ -31,13 +41,25 @@ export const eightDApi = {
 
   update: (id: number | string, data: Record<string, unknown>) => request.put<void, void>(`/v1/eight-d-reports/${id}`, data),
 
-  submit: (id: number | string) => request.post<void, void>(`/v1/eight-d-reports/${id}/submit`),
+  submit: (id: number | string, data?: EightDActionDTO) => request.post<void, void>(`/v1/eight-d-reports/${id}/submit`, data || {}),
 
-  review: (id: number | string) => request.post<void, void>(`/v1/eight-d-reports/${id}/audit`),
+  review: (id: number | string, data?: EightDActionDTO) => request.post<void, void>(`/v1/eight-d-reports/${id}/audit`, data || {}),
 
-  return: (id: number | string, data?: Record<string, unknown>) => request.post<void, void>(`/v1/eight-d-reports/${id}/reject`, data || {}),
+  return: (id: number | string, data?: EightDActionDTO) => request.post<void, void>(`/v1/eight-d-reports/${id}/reject`, data || {}),
 
-  close: (id: number | string) => request.post<void, void>(`/v1/eight-d-reports/${id}/close`),
+  close: (id: number | string, data?: EightDActionDTO) => request.post<void, void>(`/v1/eight-d-reports/${id}/close`, data || {}),
+
+  stepSubmit: (id: number | string, data: EightDActionDTO) => request.post<void, void>(`/v1/eight-d-reports/${id}/step-submit`, data),
+
+  stepApprove: (id: number | string, data?: EightDActionDTO) => request.post<void, void>(`/v1/eight-d-reports/${id}/step-approve`, data || {}),
+
+  uploadAttachment: (id: number | string, file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return request.post<number, number>(`/v1/eight-d-reports/${id}/upload-attachment`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 }
 
 export const qualityAppealApi = {
@@ -50,7 +72,7 @@ export const qualityAppealApi = {
 
   submit: (id: number | string) => request.post<void, void>(`/v1/quality-appeals/${id}/submit`),
 
-  approve: (id: number | string) => request.post<void, void>(`/v1/quality-appeals/${id}/approve`),
+  approve: (id: number | string, data: QualityAppealAuditDTO) => request.post<void, void>(`/v1/quality-appeals/${id}/approve`, data),
 
-  reject: (id: number | string, data?: Record<string, unknown>) => request.post<void, void>(`/v1/quality-appeals/${id}/reject`, data || {}),
+  reject: (id: number | string, data: QualityAppealAuditDTO) => request.post<void, void>(`/v1/quality-appeals/${id}/reject`, data),
 }

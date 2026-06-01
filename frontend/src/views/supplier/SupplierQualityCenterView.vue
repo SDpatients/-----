@@ -4,10 +4,12 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { qualityApi } from '@/api/quality'
 import { ncrApi, eightDApi, qualityAppealApi } from '@/api/qualityExtra'
+import type { QualityAppealAuditDTO } from '@/api/qualityExtra'
 import { toQuality } from '@/api/adapters'
 import PageContainer from '@/components/common/PageContainer.vue'
 import AttachmentPanel from '@/components/business/AttachmentPanel.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
+import SupplierSelector from '@/components/business/SupplierSelector.vue'
 import ExportDialog from '@/components/business/ExportDialog.vue'
 import type { QualityCase, NcrRecord, EightDReport, QualityAppeal } from '@/types/business'
 
@@ -119,13 +121,14 @@ const resetEightD = () => { eightDQuery.keyword = ''; loadEightD() }
 // 8D 创建/编辑弹窗
 const eightDDialogVisible = ref(false)
 const eightDDialogTitle = ref('创建8D报告')
-const eightDForm = reactive({ ncrId: 0, dueDate: '', reportStatus: 0 })
+const eightDForm = reactive({ ncrId: 0, supplierId: null as number | null, dueDate: '', reportStatus: 0 })
 const editingEightDId = ref(0)
 
 const openCreateEightD = () => {
   editingEightDId.value = 0
   eightDDialogTitle.value = '创建8D报告'
   eightDForm.ncrId = 0
+  eightDForm.supplierId = null
   eightDForm.dueDate = ''
   eightDForm.reportStatus = 0
   eightDDialogVisible.value = true
@@ -141,6 +144,8 @@ const openEditEightD = (row: EightDReport) => {
 }
 
 const submitEightD = async () => {
+  if (!eightDForm.ncrId) { ElMessage.warning('关联NCR不能为空'); return }
+  if (!eightDForm.supplierId) { ElMessage.warning('供应商不能为空'); return }
   try {
     if (editingEightDId.value) {
       await eightDApi.update(editingEightDId.value, { ...eightDForm })
@@ -192,15 +197,18 @@ const resetAppeal = () => { appealQuery.keyword = ''; loadAppeal() }
 
 // 申诉创建弹窗
 const appealDialogVisible = ref(false)
-const appealForm = reactive({ ncrId: 0, appealReason: '' })
+const appealForm = reactive({ ncrId: 0, supplierId: null as number | null, appealReason: '' })
 
 const openCreateAppeal = () => {
   appealForm.ncrId = 0
+  appealForm.supplierId = null
   appealForm.appealReason = ''
   appealDialogVisible.value = true
 }
 
 const submitAppeal = async () => {
+  if (!appealForm.supplierId) { ElMessage.warning('供应商不能为空'); return }
+  if (!appealForm.appealReason) { ElMessage.warning('申诉原因不能为空'); return }
   try {
     const id = await qualityAppealApi.create({ ...appealForm })
     await qualityAppealApi.submit(id)
@@ -384,6 +392,9 @@ onMounted(loadInsp)
             <el-form-item label="关联NCR" required>
               <el-input-number v-model="eightDForm.ncrId" :min="0" style="width: 100%" />
             </el-form-item>
+            <el-form-item label="供应商" required>
+              <SupplierSelector v-model="eightDForm.supplierId" />
+            </el-form-item>
             <el-form-item label="截止日期">
               <el-date-picker v-model="eightDForm.dueDate" type="date" placeholder="选择截止日期" style="width: 100%" value-format="YYYY-MM-DD" />
             </el-form-item>
@@ -453,10 +464,13 @@ onMounted(loadInsp)
         <!-- 申诉创建弹窗 -->
         <el-dialog v-model="appealDialogVisible" title="创建质量申诉" width="480px" destroy-on-close>
           <el-form :model="appealForm" label-width="100px">
-            <el-form-item label="关联NCR" required>
+            <el-form-item label="关联NCR">
               <el-input-number v-model="appealForm.ncrId" :min="0" style="width: 100%" />
             </el-form-item>
-            <el-form-item label="申诉原因">
+            <el-form-item label="供应商" required>
+              <SupplierSelector v-model="appealForm.supplierId" />
+            </el-form-item>
+            <el-form-item label="申诉原因" required>
               <el-input v-model="appealForm.appealReason" type="textarea" :rows="4" placeholder="请描述申诉原因..." />
             </el-form-item>
           </el-form>

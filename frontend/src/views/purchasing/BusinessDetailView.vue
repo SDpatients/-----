@@ -197,7 +197,7 @@ const loadDetailData = async () => {
           lineNo: l.lineNo,
           materialCode: l.materialCode,
           materialName: l.materialName,
-          materialSpec: l.spec,
+          materialSpec: l.materialSpec,
           unit: l.unit,
           quantity: l.quantity,
           unitPrice: l.unitPrice,
@@ -209,7 +209,7 @@ const loadDetailData = async () => {
       }
       // 3.2.1 加载订单变更记录
       try {
-        const changes = await orderChangeApi.page({ pageNum: 1, pageSize: 50, orderId: bid })
+        const changes = await orderChangeApi.page({ pageNum: 1, pageSize: 50, orderId: Number(bid) || undefined })
         orderChanges.value = changes.records
       } catch { orderChanges.value = [] }
       // 3.2.4 加载关联发货记录

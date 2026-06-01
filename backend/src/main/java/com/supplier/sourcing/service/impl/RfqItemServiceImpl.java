@@ -17,6 +17,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 public class RfqItemServiceImpl implements RfqItemService {
@@ -68,5 +71,37 @@ public class RfqItemServiceImpl implements RfqItemService {
             throw BusinessException.of(ResultCode.NOT_FOUND);
         }
         rfqItemMapper.deleteById(entity.getId());
+    }
+
+    @Override
+    public List<RfqItemVO> getByRfqId(Long rfqId) {
+        List<RfqItem> list = rfqItemMapper.selectList(
+                new LambdaQueryWrapper<RfqItem>()
+                        .eq(RfqItem::getRfqId, rfqId)
+                        .orderByAsc(RfqItem::getLineNo)
+        );
+        return list.stream().map(RfqItemConverter::toVO).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void saveLines(Long rfqId, List<RfqItemUpdateDTO> lines) {
+        rfqItemMapper.delete(new LambdaQueryWrapper<RfqItem>().eq(RfqItem::getRfqId, rfqId));
+        if (lines != null && !lines.isEmpty()) {
+            for (int i = 0; i < lines.size(); i++) {
+                RfqItemUpdateDTO dto = lines.get(i);
+                RfqItem entity = new RfqItem();
+                entity.setRfqId(rfqId);
+                entity.setLineNo(dto.getLineNo() != null ? dto.getLineNo() : i + 1);
+                entity.setMaterialCode(dto.getMaterialCode());
+                entity.setMaterialName(dto.getMaterialName());
+                entity.setMaterialSpec(dto.getMaterialSpec());
+                entity.setUnit(dto.getUnit());
+                entity.setQuantity(dto.getQuantity());
+                entity.setTargetDeliveryDate(dto.getTargetDeliveryDate());
+                entity.setRemark(dto.getRemark());
+                rfqItemMapper.insert(entity);
+            }
+        }
     }
 }

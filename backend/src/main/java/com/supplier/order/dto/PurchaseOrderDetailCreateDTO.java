@@ -25,6 +25,8 @@ public class PurchaseOrderDetailCreateDTO {
     private BigDecimal taxRate = BigDecimal.ZERO;
     private BigDecimal taxAmount = BigDecimal.ZERO;
     private BigDecimal amount = BigDecimal.ZERO;
+
+    @NotNull(message = "交货日期不能为空")
     private LocalDate deliveryDate;
     private String remark;
 }

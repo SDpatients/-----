@@ -6,8 +6,10 @@ import com.supplier.sourcing.dto.BargainDTO;
 import com.supplier.sourcing.dto.QuoteCreateDTO;
 import com.supplier.sourcing.query.QuoteQuery;
 import com.supplier.sourcing.service.QuoteCompareService;
+import com.supplier.sourcing.service.QuoteItemService;
 import com.supplier.sourcing.service.QuoteService;
 import com.supplier.sourcing.vo.QuoteCompareVO;
+import com.supplier.sourcing.vo.QuoteItemVO;
 import com.supplier.sourcing.vo.QuoteNegotiationVO;
 import com.supplier.sourcing.vo.QuoteVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,6 +38,7 @@ public class QuoteController {
 
     private final QuoteService quoteService;
     private final QuoteCompareService quoteCompareService;
+    private final QuoteItemService quoteItemService;
 
     @Operation(summary = "分页查询报价单")
     @GetMapping
@@ -49,6 +52,13 @@ public class QuoteController {
     @PreAuthorize("isAuthenticated()")
     public Result<QuoteVO> detail(@PathVariable @NotNull(message = "报价单ID不能为空") Long id) {
         return Result.success(quoteService.getDetail(id));
+    }
+
+    @Operation(summary = "查询报价明细行")
+    @GetMapping("/{id}/lines")
+    @PreAuthorize("isAuthenticated()")
+    public Result<List<QuoteItemVO>> lines(@PathVariable @NotNull(message = "报价单ID不能为空") Long id) {
+        return Result.success(quoteItemService.getByQuoteId(id));
     }
 
     @Operation(summary = "新增报价单")

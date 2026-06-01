@@ -8,9 +8,9 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   token: string
-  userInfo?: BackendUserInfo
-  user?: BackendUserInfo
-  permissions?: string[]
+  tokenType: string
+  expiresIn: number
+  userInfo: BackendUserInfo
 }
 
 export interface BackendUserInfo {

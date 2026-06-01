@@ -131,4 +131,5 @@ export const riskMap: Record<string, { label: string; type: TagType }> = {
   medium: { label: '中风险', type: 'warning' },
   high: { label: '高风险', type: 'danger' },
   none: { label: '无风险', type: 'info' },
+  blacklisted: { label: '已拉黑', type: 'danger' },
 }

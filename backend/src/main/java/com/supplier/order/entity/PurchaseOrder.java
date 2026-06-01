@@ -14,21 +14,29 @@ import java.time.LocalDateTime;
 @TableName("purchase_order")
 public class PurchaseOrder extends BaseEntity {
 
+    private Long tenantId;
+    private Long orgId;
     private String orderNo;
+    private String erpOrderNo;
     private Long supplierId;
+    private String supplierName;
     private LocalDate orderDate;
     private LocalDate deliveryDate;
     private String currency;
+    private BigDecimal exchangeRate;
     private BigDecimal totalAmount;
     private BigDecimal taxAmount;
     private BigDecimal discountAmount;
     private BigDecimal payAmount;
     private Integer orderStatus;
+    private LocalDateTime submitTime;
     private LocalDateTime confirmTime;
     private Long confirmBy;
+    private LocalDateTime rejectTime;
     private LocalDateTime completeTime;
     private LocalDateTime cancelTime;
     private String cancelReason;
+    private LocalDateTime closeTime;
     private Long buyerId;
     private String buyerName;
     private Long deptId;

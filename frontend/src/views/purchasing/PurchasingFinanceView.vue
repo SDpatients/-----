@@ -58,6 +58,12 @@ const perfForm = reactive({
   serviceScore: 0, priceScore: 0,
 })
 
+const formRef = ref()
+const formRules = {
+  supplierId: [{ required: true, message: '请选择供应商', trigger: 'change' }],
+  evaluatePeriod: [{ required: true, message: '评估周期不能为空', trigger: 'blur' }],
+}
+
 const openPerfCreate = () => {
   perfEditing.value = null
   perfForm.supplierId = null
@@ -81,7 +87,8 @@ const openPerfEdit = (row: any) => {
 }
 
 const submitPerf = async () => {
-  if (!perfForm.supplierId) { ElMessage.warning('请选择供应商'); return }
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) return
   try {
     if (perfEditing.value?.id) {
       await performanceApi.update(perfEditing.value.id, perfForm as any)
@@ -178,11 +185,11 @@ const handlePerfDelete = (row: any) => {
 
     <!-- 绩效评估弹窗 -->
     <el-dialog v-model="showPerfDialog" :title="perfEditing?.id ? '编辑评估' : '新增评估'" width="550px" :close-on-click-modal="false">
-      <el-form :model="perfForm" label-width="100px">
-        <el-form-item label="供应商" required>
+      <el-form ref="formRef" :model="perfForm" :rules="formRules" label-width="100px">
+        <el-form-item label="供应商" prop="supplierId">
           <SupplierSelector v-model="perfForm.supplierId" :disabled="!!perfEditing?.id" />
         </el-form-item>
-        <el-form-item label="评估周期">
+        <el-form-item label="评估周期" prop="evaluatePeriod">
           <el-input v-model="perfForm.evaluatePeriod" placeholder="如 2026-Q1" />
         </el-form-item>
         <el-row :gutter="16">

@@ -24,6 +24,7 @@ public class DeliveryDetail extends BaseEntity {
     private BigDecimal qualifiedQty;
     private String batchNo;
     private LocalDate productionDate;
+    private Integer boxCount;
     private LocalDate expiryDate;
     private String remark;
 }

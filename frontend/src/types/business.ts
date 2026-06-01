@@ -40,6 +40,10 @@ export interface Supplier {
   creditCode?: string
   auditTime?: string
   auditRemark?: string
+  blacklisted?: boolean
+  blacklistReason?: string
+  blacklistStartTime?: string
+  blacklistEndTime?: string
 }
 
 export interface PurchaseOrder {
@@ -48,9 +52,19 @@ export interface PurchaseOrder {
   supplierId?: number | string
   supplierName: string
   orderStatus?: number
+  orderDate?: string
   buyer: string
+  buyerId?: number | string
   amount: number
+  currency?: string
+  taxAmount?: number
+  discountAmount?: number
+  payAmount?: number
   deliveryDate: string
+  deliveryAddress?: string
+  paymentTerms?: string
+  confirmTime?: string
+  remark?: string
   status: string
   confirmStatus: string
   riskLevel: string
@@ -421,6 +435,7 @@ export interface EightDReport {
   reportNo: string
   ncrId: number | string
   ncrNo?: string
+  supplierId?: number | string
   d1Team?: string
   d2Problem?: string
   d3Containment?: string
@@ -430,6 +445,8 @@ export interface EightDReport {
   d7PreventAction?: string
   d8CloseSummary?: string
   dueDate: string
+  currentStep?: number
+  stepDueDate?: string
   reportStatus: number
   submitTime?: string
   auditTime?: string
@@ -441,10 +458,15 @@ export interface EightDReport {
 export interface QualityAppeal {
   id: number | string
   appealNo: string
-  ncrId: number | string
-  ncrNo?: string
+  ncrId?: number | string
+  inspectionId?: number | string
+  supplierId?: number | string
   appealReason: string
   appealStatus: number
+  submitTime?: string
+  auditBy?: number | string
+  auditTime?: string
+  auditRemark?: string
   createTime: string
 }
 
@@ -482,6 +504,7 @@ export interface PaymentRecord {
 export interface InspectionStandard {
   id: number | string
   standardNo: string
+  standardName: string
   materialCode: string
   materialName: string
   checkItem: string
@@ -679,4 +702,16 @@ export interface SupplierAccountCreateForm {
   password: string
   realName: string
   roleIds: number[]
+}
+
+// ========== 物料主数据 ==========
+export interface Material {
+  id: number | string
+  code: string
+  name: string
+  spec: string
+  unit: string
+  category: string
+  status: number
+  createTime: string
 }

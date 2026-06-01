@@ -1,6 +1,8 @@
 package com.supplier.logistics.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -31,6 +33,8 @@ public class DeliveryNoticeCreateDTO {
     private LocalDate productionDate;
     private LocalDate expiryDate;
     private String remark;
-    /** ASN 明细行 */
+
+    @NotEmpty(message = "ASN明细行不能为空")
+    @Valid
     private List<DeliveryDetailItemDTO> details;
 }

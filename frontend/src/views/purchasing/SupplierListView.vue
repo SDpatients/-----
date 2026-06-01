@@ -17,7 +17,7 @@ const loading = ref(false)
 const records = ref<Supplier[]>([])
 const total = ref(0)
 const exportVisible = ref(false)
-const query = reactive({ pageNum: 1, pageSize: 10, keyword: '', status: undefined as number | undefined })
+const query = reactive({ pageNum: 1, pageSize: 10, keyword: '', status: undefined as number | undefined, includeBlacklisted: false })
 
 // 状态链定义
 const statusChain = [
@@ -33,6 +33,7 @@ const loadData = async () => {
     const params: Record<string, unknown> = { pageNum: query.pageNum, pageSize: query.pageSize }
     if (query.keyword) params.keyword = query.keyword
     if (query.status !== undefined && query.status !== null) params.status = query.status
+    if (query.includeBlacklisted) params.includeBlacklisted = query.includeBlacklisted
     const result = await supplierApi.page(params as any)
     records.value = result.records.map(toSupplier)
     total.value = result.total
@@ -45,6 +46,7 @@ const loadData = async () => {
 const resetQuery = () => {
   query.keyword = ''
   query.status = undefined
+  query.includeBlacklisted = false
   loadData()
 }
 
@@ -52,8 +54,14 @@ const resetQuery = () => {
 const showBlacklistDialog = ref(false)
 const blacklistRow = ref<Supplier | null>(null)
 const blacklistForm = reactive({ reason: '', startTime: '', endTime: '' })
+const blacklistFormRef = ref()
+const blacklistFormRules = {
+  supplierName: [{ required: true, message: '供应商名称不能为空', trigger: 'blur' }],
+  reason: [{ required: true, message: '拉黑原因不能为空', trigger: 'blur' }],
+}
 
 const openAddBlacklist = (row: Supplier) => {
+  if (row.blacklisted) { ElMessage.warning('该供应商已在黑名单中'); return }
   blacklistRow.value = row
   blacklistForm.reason = ''
   blacklistForm.startTime = ''
@@ -63,7 +71,19 @@ const openAddBlacklist = (row: Supplier) => {
 
 const confirmAddBlacklist = async () => {
   if (!blacklistRow.value) return
-  if (!blacklistForm.reason) { ElMessage.warning('请输入拉黑原因'); return }
+  try { await blacklistFormRef.value?.validate() } catch { return }
+  if (blacklistForm.startTime && blacklistForm.endTime) {
+    if (new Date(blacklistForm.startTime).getTime() >= new Date(blacklistForm.endTime).getTime()) {
+      ElMessage.warning('生效时间必须早于结束时间')
+      return
+    }
+  }
+  if (blacklistForm.endTime) {
+    if (new Date(blacklistForm.endTime).getTime() <= Date.now()) {
+      ElMessage.warning('结束时间必须大于当前时间')
+      return
+    }
+  }
   try {
     await blacklistApi.create({
       supplierId: blacklistRow.value.id,
@@ -75,7 +95,11 @@ const confirmAddBlacklist = async () => {
     })
     ElMessage.success('已加入黑名单')
     showBlacklistDialog.value = false
-  } catch { /* */ }
+    loadData()
+  } catch (err: any) {
+    const msg = err?.response?.data?.message || err?.message || '加入黑名单失败'
+    ElMessage.error(msg)
+  }
 }
 
 // ==================== 新增供应商 ====================
@@ -84,6 +108,11 @@ const createForm = reactive({
   supplierCode: '', supplierName: '', supplierShortName: '', supplierType: 1,
   creditCode: '', contactName: '', contactPhone: '', contactEmail: '', address: '', remark: '',
 })
+const formRef = ref()
+const supplierFormRules = {
+  supplierCode: [{ required: true, message: '供应商编码不能为空', trigger: 'blur' }],
+  supplierName: [{ required: true, message: '供应商名称不能为空', trigger: 'blur' }],
+}
 
 const generateCode = () => {
   const rand = Math.floor(Math.random() * 90000 + 10000)
@@ -103,13 +132,10 @@ const openCreateDialog = () => {
 }
 
 const submitCreate = async () => {
-  if (!createForm.supplierName) {
-    ElMessage.warning('请输入供应商名称')
-    return
-  }
   if (!createForm.supplierCode) {
     generateCode()
   }
+  try { await formRef.value?.validate() } catch { return }
   try {
     const headers = await getIdempotentHeaders()
     await supplierApi.create(createForm, headers)
@@ -139,6 +165,9 @@ onMounted(loadData)
             <el-option v-for="s in statusChain" :key="s.status" :label="s.label" :value="s.status" />
           </el-select>
         </el-form-item>
+        <el-form-item label="黑名单">
+          <el-checkbox v-model="query.includeBlacklisted" @change="loadData">包含黑名单</el-checkbox>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="loadData">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
@@ -147,7 +176,18 @@ onMounted(loadData)
     </div>
     <el-table v-loading="loading" :data="records" border highlight-current-row>
       <el-table-column prop="code" label="供应商编码" width="150" />
-      <el-table-column prop="name" label="供应商名称" min-width="220" />
+      <el-table-column label="供应商名称" min-width="220">
+        <template #default="{ row }">
+          <span>{{ row.name }}</span>
+          <el-tooltip
+            v-if="row.blacklisted"
+            :content="`黑名单原因: ${row.blacklistReason || '-'}\n生效时间: ${row.blacklistStartTime || '-'}\n结束时间: ${row.blacklistEndTime || '永久'}`"
+            placement="top"
+          >
+            <el-tag type="danger" size="small" effect="dark" class="ml-2">黑名单</el-tag>
+          </el-tooltip>
+        </template>
+      </el-table-column>
       <el-table-column prop="category" label="品类" width="110" />
       <el-table-column prop="level" label="等级" width="80" />
       <el-table-column label="准入状态" width="150">
@@ -155,12 +195,12 @@ onMounted(loadData)
           <StatusTag :value="row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="风险" width="110"><template #default="{ row }"><StatusTag :value="row.riskLevel" kind="risk" /></template></el-table-column>
+      <el-table-column label="风险" width="110"><template #default="{ row }"><StatusTag :value="row.blacklisted ? 'blacklisted' : row.riskLevel" :kind="row.blacklisted ? 'risk' : 'risk'" /></template></el-table-column>
       <el-table-column prop="performanceScore" label="绩效分" width="90" />
       <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="router.push(`/purchasing/suppliers/${row.id}`)">详情</el-button>
-          <el-dropdown trigger="click" style="margin-left:4px">
+          <el-dropdown v-if="!row.blacklisted" trigger="click" style="margin-left:4px">
             <el-button link type="info">更多<el-icon><ArrowDown /></el-icon></el-button>
             <template #dropdown>
               <el-dropdown-menu>
@@ -183,15 +223,15 @@ onMounted(loadData)
         <el-tag type="danger">供应商：{{ blacklistRow.name }}（{{ blacklistRow.code }}）</el-tag>
         <span v-if="blacklistRow.creditCode" class="ml-2">信用代码：{{ blacklistRow.creditCode }}</span>
       </div>
-      <el-form :model="blacklistForm" label-width="90px">
-        <el-form-item label="拉黑原因" required>
+      <el-form ref="blacklistFormRef" :model="blacklistForm" :rules="blacklistFormRules" label-width="90px">
+        <el-form-item label="拉黑原因" prop="reason">
           <el-input v-model="blacklistForm.reason" type="textarea" :rows="3" placeholder="请输入拉黑原因" />
         </el-form-item>
         <el-form-item label="生效时间">
-          <el-date-picker v-model="blacklistForm.startTime" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="立即生效" style="width:100%" />
+          <el-date-picker v-model="blacklistForm.startTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="立即生效" style="width:100%" />
         </el-form-item>
         <el-form-item label="结束时间">
-          <el-date-picker v-model="blacklistForm.endTime" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" placeholder="永久（选填）" style="width:100%" />
+          <el-date-picker v-model="blacklistForm.endTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="永久（选填）" style="width:100%" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -202,15 +242,15 @@ onMounted(loadData)
 
     <!-- 新增弹窗 -->
     <el-dialog v-model="showCreateDialog" title="新增供应商" width="620px" :close-on-click-modal="false">
-      <el-form :model="createForm" label-width="110px">
-        <el-form-item label="供应商编码">
+      <el-form ref="formRef" :model="createForm" :rules="supplierFormRules" label-width="110px">
+        <el-form-item label="供应商编码" prop="supplierCode">
           <el-input v-model="createForm.supplierCode" placeholder="留空自动生成（选填）">
             <template #append>
               <el-button @click="generateCode">自动生成</el-button>
             </template>
           </el-input>
         </el-form-item>
-        <el-form-item label="供应商名称" required>
+        <el-form-item label="供应商名称" prop="supplierName">
           <el-input v-model="createForm.supplierName" placeholder="请输入企业全称" />
         </el-form-item>
         <el-form-item label="供应商简称">

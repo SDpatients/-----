@@ -11,6 +11,7 @@ import com.supplier.sourcing.dto.SupplierCreateDTO;
 import com.supplier.sourcing.dto.SupplierRegisterDTO;
 import com.supplier.sourcing.entity.SupplierBlacklist;
 import com.supplier.sourcing.entity.SupplierInfo;
+import com.supplier.sourcing.enums.SupplierBlacklistStatusEnum;
 import com.supplier.sourcing.enums.SupplierStatusEnum;
 import com.supplier.sourcing.mapper.SupplierBlacklistMapper;
 import com.supplier.sourcing.mapper.SupplierInfoMapper;
@@ -21,6 +22,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,8 +46,49 @@ public class SupplierServiceImpl implements SupplierService {
                         .or()
                         .like(SupplierInfo::getCreditCode, query.getKeyword()))
                 .orderByDesc(SupplierInfo::getCreateTime);
+
+        if (query.getIncludeBlacklisted() == null || !query.getIncludeBlacklisted()) {
+            wrapper.notInSql(SupplierInfo::getId,
+                    "SELECT supplier_id FROM supplier_blacklist WHERE status = " + SupplierBlacklistStatusEnum.ACTIVE.getCode());
+        }
+
         Page<SupplierInfo> page = supplierInfoMapper.selectPage(new Page<>(query.getPageNum(), query.getPageSize()), wrapper);
-        return PageResult.of(page.convert(SupplierConverter::toVO));
+
+        List<SupplierVO> voList = page.getRecords().stream()
+                .map(SupplierConverter::toVO)
+                .collect(Collectors.toList());
+
+        enrichBlacklistInfo(voList);
+
+        return PageResult.of(voList, page.getTotal(), page.getSize(), page.getCurrent());
+    }
+
+    private void enrichBlacklistInfo(List<SupplierVO> voList) {
+        if (voList.isEmpty()) return;
+
+        List<Long> supplierIds = voList.stream()
+                .map(SupplierVO::getId)
+                .collect(Collectors.toList());
+
+        List<SupplierBlacklist> activeBlacklists = supplierBlacklistMapper.selectList(
+                new LambdaQueryWrapper<SupplierBlacklist>()
+                        .in(SupplierBlacklist::getSupplierId, supplierIds)
+                        .eq(SupplierBlacklist::getStatus, SupplierBlacklistStatusEnum.ACTIVE.getCode()));
+
+        Map<Long, SupplierBlacklist> blacklistMap = activeBlacklists.stream()
+                .collect(Collectors.toMap(SupplierBlacklist::getSupplierId, b -> b, (a, b) -> a));
+
+        for (SupplierVO vo : voList) {
+            SupplierBlacklist blacklist = blacklistMap.get(vo.getId());
+            if (blacklist != null) {
+                vo.setBlacklisted(true);
+                vo.setBlacklistReason(blacklist.getReason());
+                vo.setBlacklistStartTime(blacklist.getStartTime());
+                vo.setBlacklistEndTime(blacklist.getEndTime());
+            } else {
+                vo.setBlacklisted(false);
+            }
+        }
     }
 
     @Override
@@ -51,7 +97,9 @@ public class SupplierServiceImpl implements SupplierService {
         if (supplier == null) {
             throw BusinessException.of(ResultCode.NOT_FOUND);
         }
-        return SupplierConverter.toVO(supplier);
+        SupplierVO vo = SupplierConverter.toVO(supplier);
+        enrichBlacklistInfo(List.of(vo));
+        return vo;
     }
 
     @Override

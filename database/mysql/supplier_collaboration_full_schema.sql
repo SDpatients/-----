@@ -876,6 +876,7 @@ CREATE TABLE delivery_detail (
     qualified_qty DECIMAL(18,4) NOT NULL DEFAULT 0.0000 COMMENT '合格数量',
     batch_no VARCHAR(50) DEFAULT NULL COMMENT '批次号',
     production_date DATE DEFAULT NULL COMMENT '生产日期',
+    expiry_date DATE DEFAULT NULL COMMENT '过期日期/有效期至',
     box_count INT NOT NULL DEFAULT 0 COMMENT '箱数',
     remark VARCHAR(500) DEFAULT NULL COMMENT '备注',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -1001,6 +1002,9 @@ CREATE TABLE inspection_standard (
     material_name VARCHAR(100) DEFAULT NULL COMMENT '物料名称',
     standard_name VARCHAR(100) NOT NULL COMMENT '检验标准名称',
     sample_rule VARCHAR(255) DEFAULT NULL COMMENT '抽样规则',
+    inspection_strategy TINYINT DEFAULT 1 COMMENT '检验策略(0免检,1抽检,2全检)',
+    sample_rate DECIMAL(5, 2) DEFAULT NULL COMMENT '抽检比例',
+    acceptance_rate DECIMAL(5, 2) DEFAULT NULL COMMENT '合格标准率',
     version_no VARCHAR(20) DEFAULT NULL COMMENT '版本号',
     status TINYINT NOT NULL DEFAULT 1 COMMENT '状态(0停用,1启用)',
     remark VARCHAR(500) DEFAULT NULL COMMENT '备注',
@@ -1125,6 +1129,38 @@ CREATE TABLE eight_d_report (
     UNIQUE KEY uk_ncr_id (ncr_id),
     KEY idx_supplier_status_due (supplier_id,report_status,due_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='8D整改报告表';
+
+CREATE TABLE appeal (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    appeal_no VARCHAR(50) NOT NULL COMMENT '申诉编号',
+    ncr_id BIGINT DEFAULT NULL COMMENT 'NCR ID',
+    inspection_id BIGINT DEFAULT NULL COMMENT '检验单ID',
+    deduction_id BIGINT DEFAULT NULL COMMENT '扣款单ID',
+    supplier_id BIGINT NOT NULL COMMENT '供应商ID',
+    material_code VARCHAR(50) DEFAULT NULL COMMENT '物料编码',
+    material_name VARCHAR(100) DEFAULT NULL COMMENT '物料名称',
+    appeal_reason TEXT NOT NULL COMMENT '申诉原因',
+    appeal_desc VARCHAR(500) DEFAULT NULL COMMENT '申诉说明',
+    adjust_amount DECIMAL(18, 2) DEFAULT NULL COMMENT '调整金额',
+    appeal_status TINYINT NOT NULL DEFAULT 0 COMMENT '状态(0草稿,1已提交,2审核通过,3审核驳回)',
+    submit_time DATETIME DEFAULT NULL COMMENT '提交时间',
+    reviewer BIGINT DEFAULT NULL COMMENT '审核人',
+    reviewer_name VARCHAR(100) DEFAULT NULL COMMENT '审核人姓名',
+    review_time DATETIME DEFAULT NULL COMMENT '审核时间',
+    review_opinion VARCHAR(500) DEFAULT NULL COMMENT '审核意见',
+    remark VARCHAR(500) DEFAULT NULL COMMENT '备注',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    create_by BIGINT DEFAULT NULL COMMENT '创建人',
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    update_by BIGINT DEFAULT NULL COMMENT '更新人',
+    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+    version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本号',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_appeal_no (appeal_no),
+    KEY idx_supplier_status_time (supplier_id, appeal_status, create_time),
+    KEY idx_ncr_id (ncr_id),
+    KEY idx_deduction_id (deduction_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='质检申诉联动扣款表';
 
 CREATE TABLE quality_appeal (
     id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',

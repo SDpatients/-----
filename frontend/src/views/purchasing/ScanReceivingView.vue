@@ -3,18 +3,17 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { logisticsApi } from '@/api/logistics'
-import { toAsn } from '@/api/adapters'
+import { toAsn, toReceiptRecord } from '@/api/adapters'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
-import type { AsnNotice } from '@/types/business'
+import type { ReceiptRecord } from '@/types/business'
 
 const router = useRouter()
 const barcodeInput = ref('')
 const inputRef = ref<HTMLInputElement>()
 const loading = ref(false)
-const scannedAsn = ref<AsnNotice | null>(null)
+const scannedRecord = ref<ReceiptRecord | null>(null)
 
-// 收货确认表单
 const receiveForm = reactive({
   receivedQty: 0,
   location: '',
@@ -36,47 +35,48 @@ function onScan() {
 async function lookupByBarcode(barcode: string) {
   loading.value = true
   try {
-    const result = await logisticsApi.scanReceive(barcode)
-    scannedAsn.value = toAsn(result)
-    receiveForm.receivedQty = scannedAsn.value.quantity || 0
-    receiveForm.location = scannedAsn.value.warehouse || ''
-    ElMessage.success(`已识别：${scannedAsn.value.asnNo}`)
+    const result = await logisticsApi.receiptScan(barcode)
+    scannedRecord.value = toReceiptRecord(result)
+    receiveForm.receivedQty = scannedRecord.value.receiptQty || scannedRecord.value.planQty || 0
+    receiveForm.location = scannedRecord.value.location || ''
+    ElMessage.success(`已识别：物料 ${scannedRecord.value.materialName}`)
   } catch {
-    scannedAsn.value = null
-    ElMessage.error('未找到匹配的送货单，请检查条码')
+    scannedRecord.value = null
+    ElMessage.error('未找到匹配的收货记录，请检查条码')
   } finally {
     loading.value = false
   }
 }
 
 async function confirmReceive() {
-  if (!scannedAsn.value) return
+  if (!scannedRecord.value) return
   if (receiveForm.receivedQty <= 0) {
     ElMessage.warning('请输入实收数量')
     return
   }
   loading.value = true
   try {
-    const data: any = {
-      receivedQty: receiveForm.receivedQty,
+    const planQty = scannedRecord.value.planQty || 0
+    const confirmData: any = {
+      receiptQty: receiveForm.receivedQty,
       location: receiveForm.location,
       remark: receiveForm.remark,
     }
-    // 如果有差异，追加差异信息
-    const asnQty = scannedAsn.value.quantity || 0
-    if (receiveForm.receivedQty !== asnQty) {
-      data.discrepancy = {
-        asnId: scannedAsn.value.id,
-        asnNo: scannedAsn.value.asnNo,
-        receivedQty: receiveForm.receivedQty,
-        discrepantQty: asnQty - receiveForm.receivedQty,
-        discrepancyReason: receiveForm.discrepancyReason || '数量差异',
-        discrepancyType: receiveForm.discrepancyType || (receiveForm.receivedQty < asnQty ? '少收' : '多收'),
-        handler: '',
-        remark: receiveForm.remark,
-      }
+    if (receiveForm.receivedQty !== planQty) {
+      confirmData.rejectQty = planQty - receiveForm.receivedQty
+      if (confirmData.rejectQty < 0) confirmData.rejectQty = 0
     }
-    await logisticsApi.confirmScanReceive(scannedAsn.value.id, data)
+    await logisticsApi.receiptConfirm(scannedRecord.value.id, confirmData)
+    if (receiveForm.receivedQty !== planQty) {
+      try {
+        await logisticsApi.receiptAdjust(scannedRecord.value.id, {
+          diffQty: Math.abs(planQty - receiveForm.receivedQty),
+          diffReason: receiveForm.discrepancyReason || '数量差异',
+          handleMethod: receiveForm.discrepancyType === '破损' ? 2 : 1,
+          remark: receiveForm.remark,
+        })
+      } catch { /* 差异调整失败不影响主流程 */ }
+    }
     ElMessage.success('收货确认成功')
     resetForm()
   } finally {
@@ -85,7 +85,7 @@ async function confirmReceive() {
 }
 
 function resetForm() {
-  scannedAsn.value = null
+  scannedRecord.value = null
   barcodeInput.value = ''
   receiveForm.receivedQty = 0
   receiveForm.location = ''
@@ -108,8 +108,8 @@ onMounted(() => {
   inputRef.value?.focus()
 })
 
-const asnQty = computed(() => scannedAsn.value?.quantity || 0)
-const hasDiscrepancy = computed(() => scannedAsn.value && receiveForm.receivedQty !== asnQty.value)
+const planQty = computed(() => scannedRecord.value?.planQty || 0)
+const hasDiscrepancy = computed(() => scannedRecord.value && receiveForm.receivedQty !== planQty.value)
 </script>
 
 <template>
@@ -141,36 +141,36 @@ const hasDiscrepancy = computed(() => scannedAsn.value && receiveForm.receivedQt
       <el-divider />
 
       <!-- 扫码结果 -->
-      <div v-if="scannedAsn" v-loading="loading" class="scan-result">
+      <div v-if="scannedRecord" v-loading="loading" class="scan-result">
         <div class="result-header">
-          <div class="result-title">送货单信息</div>
-          <StatusTag :value="scannedAsn.status" />
+          <div class="result-title">收货记录信息</div>
+          <StatusTag :value="scannedRecord.receiptStatus" />
         </div>
 
         <div class="result-grid">
           <div class="result-item">
-            <span class="result-label">ASN号</span>
-            <span class="result-value">{{ scannedAsn.asnNo }}</span>
+            <span class="result-label">物料编码</span>
+            <span class="result-value">{{ scannedRecord.materialCode }}</span>
           </div>
           <div class="result-item">
-            <span class="result-label">订单号</span>
-            <span class="result-value">{{ scannedAsn.orderNo }}</span>
+            <span class="result-label">物料名称</span>
+            <span class="result-value">{{ scannedRecord.materialName }}</span>
           </div>
           <div class="result-item">
-            <span class="result-label">供应商</span>
-            <span class="result-value">{{ scannedAsn.supplierName }}</span>
+            <span class="result-label">计划数量</span>
+            <span class="result-value">{{ scannedRecord.planQty }}</span>
           </div>
           <div class="result-item">
-            <span class="result-label">应发数量</span>
-            <span class="result-value">{{ scannedAsn.quantity }}</span>
+            <span class="result-label">已收数量</span>
+            <span class="result-value">{{ scannedRecord.receiptQty }}</span>
           </div>
           <div class="result-item">
             <span class="result-label">仓库</span>
-            <span class="result-value">{{ scannedAsn.warehouse }}</span>
+            <span class="result-value">{{ scannedRecord.warehouseName || '-' }}</span>
           </div>
           <div class="result-item">
-            <span class="result-label">预计到货</span>
-            <span class="result-value">{{ scannedAsn.eta }}</span>
+            <span class="result-label">库位</span>
+            <span class="result-value">{{ scannedRecord.location || '-' }}</span>
           </div>
         </div>
 
@@ -182,8 +182,8 @@ const hasDiscrepancy = computed(() => scannedAsn.value && receiveForm.receivedQt
             <el-form-item label="实收数量" required>
               <el-input-number v-model="receiveForm.receivedQty" :min="0" style="width: 200px" />
               <span v-if="hasDiscrepancy" class="diff-warning">
-                {{ receiveForm.receivedQty < asnQty ? '少收' : '多收' }}
-                {{ Math.abs(receiveForm.receivedQty - asnQty) }}
+                {{ receiveForm.receivedQty < planQty ? '少收' : '多收' }}
+                {{ Math.abs(receiveForm.receivedQty - planQty) }}
               </span>
             </el-form-item>
             <el-form-item label="收货库位">
@@ -203,7 +203,7 @@ const hasDiscrepancy = computed(() => scannedAsn.value && receiveForm.receivedQt
                 </el-select>
               </el-form-item>
               <el-form-item label="差异数量">
-                <el-input-number v-model="receiveForm.discrepantQty" :min="0" :value="Math.abs(receiveForm.receivedQty - asnQty)" disabled style="width: 200px" />
+                <el-input-number v-model="receiveForm.discrepantQty" :min="0" :value="Math.abs(receiveForm.receivedQty - planQty)" disabled style="width: 200px" />
               </el-form-item>
               <el-form-item label="差异原因">
                 <el-input
@@ -229,7 +229,7 @@ const hasDiscrepancy = computed(() => scannedAsn.value && receiveForm.receivedQt
         </div>
       </div>
 
-      <el-empty v-if="!scannedAsn && !loading" description="扫描或输入条码查询待收货的送货单" :image-size="120" />
+      <el-empty v-if="!scannedRecord && !loading" description="扫描或输入条码查询待收货记录" :image-size="120" />
     </div>
   </PageContainer>
 </template>

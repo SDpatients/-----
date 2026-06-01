@@ -14,6 +14,8 @@ import java.time.LocalDateTime;
 @TableName("supplier_info")
 public class SupplierInfo extends BaseEntity {
 
+    private Long tenantId;
+    private Long orgId;
     private String supplierCode;
     private String supplierName;
     private String supplierShortName;
@@ -38,6 +40,7 @@ public class SupplierInfo extends BaseEntity {
     private String invoicePhone;
     private Integer rating;
     private Integer status;
+    private LocalDateTime submitTime;
     private LocalDateTime auditTime;
     private Long auditBy;
     private String auditRemark;

@@ -1,5 +1,6 @@
 package com.supplier.quality.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -15,13 +16,19 @@ public class EightDReportCreateDTO {
     private Long supplierId;
 
     private String d1Team;
+
+    @NotBlank(message = "问题描述不能为空")
     private String d2Problem;
+
     private String d3Containment;
     private String d4RootCause;
     private String d5CorrectiveAction;
     private String d6ValidateAction;
     private String d7PreventAction;
     private String d8CloseSummary;
+
+    @NotNull(message = "截止日期不能为空")
     private LocalDate dueDate;
+
     private Integer currentStep;
 }

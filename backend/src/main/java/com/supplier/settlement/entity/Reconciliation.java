@@ -27,5 +27,6 @@ public class Reconciliation extends BaseEntity {
     private LocalDateTime confirmTime;
     private Long confirmBy;
     private String confirmRemark;
+    private LocalDateTime closeTime;
     private String remark;
 }

@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ncrApi, eightDApi, qualityAppealApi } from '@/api/qualityExtra'
+import type { EightDActionDTO, QualityAppealAuditDTO } from '@/api/qualityExtra'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import ExportDialog from '@/components/business/ExportDialog.vue'
@@ -138,6 +139,7 @@ const openD8Create = () => { d8Form.ncrId = ''; d8Form.supplierId = null; d8Form
 
 const submitD8 = async () => {
   if (!d8Form.ncrId) { ElMessage.warning('NCR ID不能为空'); return }
+  if (!d8Form.supplierId) { ElMessage.warning('供应商不能为空'); return }
   try {
     await eightDApi.create({ ncrId: Number(d8Form.ncrId), supplierId: d8Form.supplierId, dueDate: d8Form.dueDate || undefined })
     ElMessage.success('8D报告创建成功')
@@ -147,16 +149,21 @@ const submitD8 = async () => {
 }
 
 const handleD8Submit = async (row: EightDReport) => {
-  try { await ElMessageBox.confirm(`确认提交 8D 报告 ${row.reportNo}？`, '确认'); await eightDApi.submit(row.id); ElMessage.success('已提交'); load8D() } catch { /* cancel */ }
+  try { await ElMessageBox.confirm(`确认提交 8D 报告 ${row.reportNo}？`, '确认'); await eightDApi.submit(row.id, { remark: '提交8D整改报告' }); ElMessage.success('已提交'); load8D() } catch { /* cancel */ }
 }
 const handleD8Review = async (row: EightDReport) => {
-  try { await ElMessageBox.confirm(`确认审核通过 8D 报告 ${row.reportNo}？`, '确认'); await eightDApi.review(row.id); ElMessage.success('审核通过'); load8D() } catch { /* cancel */ }
+  try { await ElMessageBox.confirm(`确认审核通过 8D 报告 ${row.reportNo}？`, '确认'); await eightDApi.review(row.id, { remark: '审核通过' }); ElMessage.success('审核通过'); load8D() } catch { /* cancel */ }
 }
 const handleD8Return = async (row: EightDReport) => {
-  try { await ElMessageBox.confirm(`确认退回 8D 报告 ${row.reportNo}？`, '确认'); await eightDApi.return(row.id); ElMessage.success('已退回'); load8D() } catch { /* cancel */ }
+  try {
+    const { value } = await ElMessageBox.prompt('请输入退回原因', `退回 8D 报告 ${row.reportNo}`, { confirmButtonText: '确认退回', cancelButtonText: '取消', inputPattern: /.+/, inputErrorMessage: '退回原因不能为空' })
+    await eightDApi.return(row.id, { remark: value })
+    ElMessage.success('已退回')
+    load8D()
+  } catch { /* cancel */ }
 }
 const handleD8Close = async (row: EightDReport) => {
-  try { await ElMessageBox.confirm(`确认关闭 8D 报告 ${row.reportNo}？`, '确认'); await eightDApi.close(row.id); ElMessage.success('已关闭'); load8D() } catch { /* cancel */ }
+  try { await ElMessageBox.confirm(`确认关闭 8D 报告 ${row.reportNo}？`, '确认'); await eightDApi.close(row.id, { remark: '关闭8D报告' }); ElMessage.success('已关闭'); load8D() } catch { /* cancel */ }
 }
 
 /* ======================== 申诉 ======================== */
@@ -181,10 +188,20 @@ const loadAppeal = async () => {
 const resetAppeal = () => { appealQuery.keyword = ''; appealQuery.appealStatus = undefined; loadAppeal() }
 
 const handleAppealApprove = async (row: QualityAppeal) => {
-  try { await ElMessageBox.confirm(`确认审批通过申诉 ${row.appealNo}？`, '确认'); await qualityAppealApi.approve(row.id); ElMessage.success('审批通过'); loadAppeal() } catch { /* cancel */ }
+  try {
+    const { value } = await ElMessageBox.prompt('请输入审批意见', `审批通过申诉 ${row.appealNo}`, { confirmButtonText: '确认通过', cancelButtonText: '取消', inputPattern: /.+/, inputErrorMessage: '审批意见不能为空' })
+    await qualityAppealApi.approve(row.id, { auditRemark: value })
+    ElMessage.success('审批通过')
+    loadAppeal()
+  } catch { /* cancel */ }
 }
 const handleAppealReject = async (row: QualityAppeal) => {
-  try { await ElMessageBox.confirm(`确认驳回申诉 ${row.appealNo}？`, '确认'); await qualityAppealApi.reject(row.id); ElMessage.success('已驳回'); loadAppeal() } catch { /* cancel */ }
+  try {
+    const { value } = await ElMessageBox.prompt('请输入驳回原因', `驳回申诉 ${row.appealNo}`, { confirmButtonText: '确认驳回', cancelButtonText: '取消', inputPattern: /.+/, inputErrorMessage: '驳回原因不能为空' })
+    await qualityAppealApi.reject(row.id, { auditRemark: value })
+    ElMessage.success('已驳回')
+    loadAppeal()
+  } catch { /* cancel */ }
 }
 
 const handleTabChange = (tab: string) => {

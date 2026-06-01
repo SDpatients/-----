@@ -16,6 +16,7 @@ public class SysPermission extends BaseEntity {
     private Long parentId;
     private String path;
     private String component;
+    private String httpMethod;
     private String icon;
     private Integer sort;
     private Integer visible;
