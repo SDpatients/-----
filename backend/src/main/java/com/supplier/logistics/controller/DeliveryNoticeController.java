@@ -6,6 +6,7 @@ import com.supplier.logistics.dto.DeliveryActionDTO;
 import com.supplier.logistics.dto.DeliveryNoticeCreateDTO;
 import com.supplier.logistics.query.DeliveryNoticeQuery;
 import com.supplier.logistics.service.DeliveryNoticeService;
+import com.supplier.logistics.vo.DeliveryDetailVO;
 import com.supplier.logistics.vo.DeliveryNoticeVO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -18,6 +19,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @Validated
 @RestController
@@ -55,6 +58,34 @@ public class DeliveryNoticeController {
     @PreAuthorize("isAuthenticated()")
     public Result<Void> arrive(@PathVariable @NotNull(message = "送货通知ID不能为空") Long id, @RequestBody(required = false) DeliveryActionDTO dto) {
         deliveryNoticeService.arrive(id, dto);
+        return Result.success();
+    }
+
+    @GetMapping("/{id}/lines")
+    @PreAuthorize("isAuthenticated()")
+    public Result<List<DeliveryDetailVO>> lines(@PathVariable @NotNull(message = "送货通知ID不能为空") Long id) {
+        return Result.success(deliveryNoticeService.getLines(id));
+    }
+
+    @PostMapping("/{id}/warehousing")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Void> warehousing(@PathVariable @NotNull(message = "送货通知ID不能为空") Long id) {
+        deliveryNoticeService.warehousing(id);
+        return Result.success();
+    }
+
+    @PostMapping("/{id}/trigger-quality")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Void> triggerQuality(@PathVariable @NotNull(message = "送货通知ID不能为空") Long id) {
+        deliveryNoticeService.triggerQuality(id);
+        return Result.success();
+    }
+
+    @PostMapping("/{id}/scan-receive")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Void> scanReceive(@PathVariable @NotNull(message = "送货通知ID不能为空") Long id,
+                                    @RequestBody(required = false) DeliveryActionDTO dto) {
+        deliveryNoticeService.scanReceive(id, dto);
         return Result.success();
     }
 }

@@ -1,5 +1,7 @@
 package com.supplier.order.vo;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -9,8 +11,10 @@ import java.time.LocalDateTime;
 @Data
 public class PurchaseOrderVO {
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
     private String orderNo;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long supplierId;
     private LocalDate orderDate;
     private LocalDate deliveryDate;
@@ -19,6 +23,7 @@ public class PurchaseOrderVO {
     private BigDecimal payAmount;
     private Integer orderStatus;
     private LocalDateTime confirmTime;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long buyerId;
     private String buyerName;
     private String deliveryAddress;

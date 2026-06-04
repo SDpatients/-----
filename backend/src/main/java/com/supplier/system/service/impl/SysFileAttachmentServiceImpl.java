@@ -9,10 +9,12 @@ import com.supplier.security.util.SecurityUtils;
 import com.supplier.system.dto.SysFileAttachmentCreateDTO;
 import com.supplier.system.entity.SysFileAttachment;
 import com.supplier.system.mapper.SysFileAttachmentMapper;
+import com.supplier.system.mapper.SysUserMapper;
 import com.supplier.system.query.SysFileAttachmentQuery;
 import com.supplier.system.service.SysFileAttachmentService;
 import com.supplier.system.service.FileStorageService;
 import com.supplier.system.vo.SysFileAttachmentVO;
+import com.supplier.system.entity.SysUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class SysFileAttachmentServiceImpl implements SysFileAttachmentService {
     private final SysFileAttachmentMapper mapper;
     private final FileStorageService fileStorageService;
+    private final SysUserMapper userMapper;
 
     @Override
     public PageResult<SysFileAttachmentVO> page(SysFileAttachmentQuery query) {
@@ -87,6 +90,21 @@ public class SysFileAttachmentServiceImpl implements SysFileAttachmentService {
         mapper.updateById(entity);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void rename(Long id, String fileName) {
+        if (!StringUtils.hasText(fileName)) {
+            throw BusinessException.of(ResultCode.PARAM_ERROR.getCode(), "文件名不能为空");
+        }
+        SysFileAttachment entity = getById(id);
+        entity.setFileName(fileName);
+        String ext = fileName.contains(".") ? fileName.substring(fileName.lastIndexOf(".") + 1) : "";
+        if (StringUtils.hasText(ext)) {
+            entity.setFileExt(ext);
+        }
+        mapper.updateById(entity);
+    }
+
     private SysFileAttachment getById(Long id) {
         SysFileAttachment entity = mapper.selectById(id);
         if (entity == null) {
@@ -98,6 +116,10 @@ public class SysFileAttachmentServiceImpl implements SysFileAttachmentService {
     private SysFileAttachmentVO toVO(SysFileAttachment e) {
         SysFileAttachmentVO vo = new SysFileAttachmentVO();
         vo.setId(e.getId()); vo.setBusinessType(e.getBusinessType()); vo.setBusinessId(e.getBusinessId()); vo.setBusinessNo(e.getBusinessNo()); vo.setFileName(e.getFileName()); vo.setFileExt(e.getFileExt()); vo.setFileSize(e.getFileSize()); vo.setContentType(e.getContentType()); vo.setBucketName(e.getBucketName()); vo.setObjectKey(e.getObjectKey()); vo.setFileHash(e.getFileHash()); vo.setUploadUserId(e.getUploadUserId()); vo.setUploadTime(e.getUploadTime()); vo.setStatus(e.getStatus());
+        if (e.getUploadUserId() != null) {
+            SysUser uploadUser = userMapper.selectById(e.getUploadUserId());
+            vo.setUploadUserName(uploadUser != null ? uploadUser.getRealName() : null);
+        }
         return vo;
     }
 }

@@ -10,6 +10,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -43,5 +47,29 @@ public class ImportTaskServiceImpl implements ImportTaskService {
     @Override
     public SysFileAttachmentService.FileDownload downloadErrors(Long fileId) throws IOException {
         return fileAttachmentService.load(fileId);
+    }
+
+    @Override
+    public List<Map<String, Object>> listTemplates() {
+        List<Map<String, Object>> templates = new ArrayList<>();
+        String[][] templateData = {
+                {"1", "订单", "purchase-order", "xlsx", "采购订单导入模板"},
+                {"2", "ASN", "asn", "xlsx", "ASN明细导入模板"},
+                {"3", "对账单", "reconciliation", "xlsx", "对账明细导入模板"},
+                {"4", "发票", "invoice", "xlsx", "发票导入模板"},
+                {"5", "付款", "payment", "xlsx", "付款导入模板"},
+                {"6", "供应商", "supplier", "xlsx", "供应商导入模板"},
+        };
+        for (String[] data : templateData) {
+            Map<String, Object> tpl = new LinkedHashMap<>();
+            tpl.put("id", Long.valueOf(data[0]));
+            tpl.put("module", data[1]);
+            tpl.put("importType", data[2]);
+            tpl.put("name", data[4]);
+            tpl.put("format", data[3]);
+            tpl.put("updatedAt", java.time.LocalDate.now().toString());
+            templates.add(tpl);
+        }
+        return templates;
     }
 }

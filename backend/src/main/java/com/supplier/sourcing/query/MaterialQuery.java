@@ -15,4 +15,5 @@ public class MaterialQuery {
     private Long pageSize = 10L;
 
     private String keyword;
+    private String category;
 }

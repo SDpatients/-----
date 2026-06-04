@@ -6,24 +6,14 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const goDashboard = () => {
-  console.debug('[ForbiddenView] 点击返回工作台', {
-    userType: userStore.user?.userType,
-    permissions: userStore.permissions,
-    token: Boolean(userStore.token),
-  })
-
   const userType = userStore.user?.userType
   if (userType === 'supplier') {
-    console.debug('[ForbiddenView] 供应商用户，跳转 /supplier/dashboard')
     router.push('/supplier/dashboard')
   } else if (userType === 'internal') {
-    console.debug('[ForbiddenView] 内部用户，跳转 /purchasing/dashboard')
     router.push('/purchasing/dashboard')
   } else if (!userStore.token) {
-    console.debug('[ForbiddenView] 未登录，跳转 /login')
     router.push('/login')
   } else {
-    console.debug('[ForbiddenView] 未知用户类型，跳转 /login')
     router.push('/login')
   }
 }

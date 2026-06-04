@@ -1,5 +1,7 @@
 package com.supplier.settlement.vo;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -12,8 +14,10 @@ import java.util.List;
 @Data
 public class ReconciliationSummaryVO {
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long reconId;
     private String reconNo;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long supplierId;
     private String supplierName;
     private String reconPeriod;

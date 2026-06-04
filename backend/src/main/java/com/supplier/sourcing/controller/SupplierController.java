@@ -4,6 +4,7 @@ import com.supplier.common.result.PageResult;
 import com.supplier.common.result.Result;
 import com.supplier.sourcing.dto.SupplierCreateDTO;
 import com.supplier.sourcing.dto.SupplierRegisterDTO;
+import com.supplier.sourcing.dto.SupplierUpdateDTO;
 import com.supplier.sourcing.query.SupplierQuery;
 import com.supplier.sourcing.service.SupplierService;
 import com.supplier.sourcing.vo.SupplierVO;
@@ -66,6 +67,15 @@ public class SupplierController {
     public Result<Void> toggleStatus(@PathVariable @NotNull(message = "供应商ID不能为空") Long id,
                                      @NotNull(message = "状态不能为空") @RequestParam Integer status) {
         supplierService.toggleStatus(id, status);
+        return Result.success();
+    }
+
+    @Operation(summary = "更新供应商信息")
+    @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Void> update(@PathVariable @NotNull(message = "供应商ID不能为空") Long id,
+                               @Valid @RequestBody SupplierUpdateDTO dto) {
+        supplierService.update(id, dto);
         return Result.success();
     }
 }

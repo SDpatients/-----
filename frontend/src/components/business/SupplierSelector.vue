@@ -5,7 +5,7 @@ import { toSupplier } from '@/api/adapters'
 import type { Supplier } from '@/types/business'
 
 const props = withDefaults(defineProps<{
-  modelValue?: number | number[] | null
+  modelValue?: number | string | (number | string)[] | null
   placeholder?: string
   clearable?: boolean
   disabled?: boolean
@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  'update:modelValue': [value: number | number[] | null]
+  'update:modelValue': [value: number | string | (number | string)[] | null]
   select: [supplier: Supplier]
 }>()
 
@@ -43,11 +43,11 @@ const remoteSearch = (keyword: string) => {
   }, 300)
 }
 
-const handleChange = (val: number | number[] | undefined) => {
+const handleChange = (val: number | string | (number | string)[] | undefined) => {
   if (props.multiple) {
-    emit('update:modelValue', (val as number[]) ?? [])
+    emit('update:modelValue', (val as (number | string)[]) ?? [])
   } else {
-    emit('update:modelValue', (val as number) ?? null)
+    emit('update:modelValue', (val as number | string) ?? null)
     if (val && !Array.isArray(val)) {
       const selected = options.value.find(s => s.id === val)
       if (selected) emit('select', selected)

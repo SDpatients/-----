@@ -52,7 +52,7 @@ defineExpose({ load })
 // ---- 创建付款弹窗（仅采购方） ----
 const showCreate = ref(false)
 const createForm = reactive({
-  paymentNo: '', supplierId: null as number | null, invoiceId: null as number | null, invoiceNo: '',
+  paymentNo: '', supplierId: null as string | null, invoiceId: null as string | null, invoiceNo: '',
   paymentAmount: 0, paymentMethod: 1, paymentAccount: '',
   scheduleDate: '', paymentTerms: '',
 })
@@ -186,9 +186,12 @@ const viewDetail = (row: any) => { detailRow.value = row; detailVisible.value = 
         <el-form-item v-if="isPurchasing" label="状态">
           <el-select v-model="query.paymentStatus" placeholder="全部" clearable style="width:160px" @change="load">
             <el-option label="待付款" :value="0" />
-            <el-option label="部分付款" :value="1" />
-            <el-option label="已付款" :value="2" />
-            <el-option label="已拒绝" :value="3" />
+            <el-option label="审批中" :value="1" />
+            <el-option label="已审批" :value="2" />
+            <el-option label="已排期" :value="3" />
+            <el-option label="已付款" :value="4" />
+            <el-option label="已拒绝" :value="5" />
+            <el-option label="已取消" :value="6" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -217,7 +220,7 @@ const viewDetail = (row: any) => { detailRow.value = row; detailVisible.value = 
           <template #default="{ row }">
             <span style="display:flex;align-items:center;gap:4px;">
               <StatusTag :value="row.paymentStatus" prefix="付款" />
-              <el-button v-if="row.paymentStatus >= 2" link size="small" type="info" @click="viewCallbackLogs(row)">回传</el-button>
+              <el-button v-if="row.paymentStatus >= 4" link size="small" type="info" @click="viewCallbackLogs(row)">回传</el-button>
             </span>
           </template>
         </el-table-column>
@@ -227,8 +230,8 @@ const viewDetail = (row: any) => { detailRow.value = row; detailVisible.value = 
             <!-- 采购方操作 -->
             <template v-if="isPurchasing">
               <el-button v-if="row.paymentStatus === 0" link type="primary" @click="handleSubmitApproval(row)">提交审批</el-button>
-              <el-button v-if="row.paymentStatus === 0 || row.paymentStatus === 1" link type="success" @click="handleSchedule(row)">排期</el-button>
-              <el-button v-if="row.paymentStatus === 0 || row.paymentStatus === 1" link type="success" @click="handlePay(row)">付款</el-button>
+              <el-button v-if="row.paymentStatus === 2" link type="success" @click="handleSchedule(row)">排期</el-button>
+              <el-button v-if="row.paymentStatus === 3" link type="success" @click="handlePay(row)">付款</el-button>
               <el-button v-if="row.paymentStatus === 0" link type="danger" @click="handleReject(row)">拒绝</el-button>
               <el-button v-if="row.paymentStatus === 0" link type="warning" @click="handleCancel(row)">取消</el-button>
               <el-button link type="info" @click="viewLinkedInvoices(row)">关联发票</el-button>

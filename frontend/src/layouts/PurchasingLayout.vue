@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { DataBoard, Document, Goods, Money, OfficeBuilding, SetUp, Van, Tools, Collection, Box, Connection } from '@element-plus/icons-vue'
+import { DataBoard, Document, Goods, Money, OfficeBuilding, SetUp, Van, Tools, Collection, Box, Connection, ShoppingCart, Notebook, Folder, QuestionFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import NotificationBell from '@/components/business/NotificationBell.vue'
 import GlobalSearch from '@/components/business/GlobalSearch.vue'
@@ -13,6 +13,13 @@ const userStore = useUserStore()
 const menus = [
   { path: '/purchasing/dashboard', title: '工作台', icon: DataBoard },
   { path: '/purchasing/suppliers', title: '供应商管理', icon: OfficeBuilding },
+  {
+    title: '基础资料', icon: Folder, key: 'basic-data',
+    children: [
+      { path: '/purchasing/materials', title: '物料管理' },
+      { path: '/purchasing/dict', title: '字典管理' },
+    ],
+  },
   { path: '/purchasing/rfq', title: 'RFQ询价', icon: Collection },
   { path: '/purchasing/quotes', title: '报价对比', icon: Money },
   { path: '/purchasing/orders', title: '采购订单', icon: Document },
@@ -22,9 +29,18 @@ const menus = [
   { path: '/purchasing/settlements', title: '财务结算', icon: Goods },
   { path: '/purchasing/integration', title: '集成网关', icon: Connection },
   { path: '/purchasing/settings', title: '系统配置', icon: Tools },
+  { path: '/purchasing/faq', title: '常见问题', icon: QuestionFilled },
 ]
 
 const activeMenu = computed(() => route.meta.activeMenu as string || route.path)
+
+const openedMenus = computed(() => {
+  const p = route.path
+  if (p.startsWith('/purchasing/materials') || p.startsWith('/purchasing/dict')) {
+    return ['basic-data']
+  }
+  return []
+})
 
 const logout = () => {
   userStore.logout()
@@ -42,11 +58,22 @@ const logout = () => {
           <div class="brand-subtitle">Supplier Hub</div>
         </div>
       </div>
-      <el-menu :default-active="activeMenu" router background-color="transparent" text-color="#c9d7ee" active-text-color="#ffffff">
-        <el-menu-item v-for="item in menus" :key="item.path" :index="item.path">
-          <el-icon><component :is="item.icon" /></el-icon>
-          <span>{{ item.title }}</span>
-        </el-menu-item>
+      <el-menu :default-active="activeMenu" :default-openeds="openedMenus" router background-color="transparent" text-color="#c9d7ee" active-text-color="#ffffff">
+        <template v-for="item in menus" :key="item.title">
+          <el-menu-item v-if="item.path" :index="item.path">
+            <el-icon><component :is="item.icon" /></el-icon>
+            <span>{{ item.title }}</span>
+          </el-menu-item>
+          <el-sub-menu v-else :index="item.key">
+            <template #title>
+              <el-icon><component :is="item.icon" /></el-icon>
+              <span>{{ item.title }}</span>
+            </template>
+            <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path">
+              <span>{{ child.title }}</span>
+            </el-menu-item>
+          </el-sub-menu>
+        </template>
       </el-menu>
     </el-aside>
     <el-container>
@@ -125,6 +152,24 @@ const logout = () => {
 }
 
 .layout-aside :deep(.el-menu-item.is-active) {
+  background: linear-gradient(135deg, #1f5eff, #0bb783);
+}
+
+.layout-aside :deep(.el-sub-menu__title) {
+  height: 48px;
+  margin: 4px 12px;
+  border-radius: 12px;
+  color: #c9d7ee !important;
+}
+
+.layout-aside :deep(.el-sub-menu .el-menu-item) {
+  height: 40px;
+  margin: 2px 12px 2px 36px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.layout-aside :deep(.el-sub-menu .el-menu-item.is-active) {
   background: linear-gradient(135deg, #1f5eff, #0bb783);
 }
 

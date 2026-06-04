@@ -3,6 +3,7 @@ package com.supplier.sourcing.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import cn.hutool.core.util.RandomUtil;
+import com.supplier.common.annotation.AuditLog;
 import com.supplier.common.exception.BusinessException;
 import com.supplier.common.result.PageResult;
 import com.supplier.common.result.ResultCode;
@@ -28,6 +29,7 @@ import com.supplier.sourcing.query.RfqQuery;
 import com.supplier.sourcing.service.RfqService;
 import com.supplier.sourcing.vo.RfqVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -35,21 +37,28 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
+import com.supplier.sourcing.entity.RfqSupplier;
+import com.supplier.sourcing.mapper.RfqSupplierMapper;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RfqServiceImpl implements RfqService {
 
     private final RfqMapper rfqMapper;
     private final RfqItemMapper rfqItemMapper;
+    private final RfqSupplierMapper rfqSupplierMapper;
     private final QuoteMapper quoteMapper;
     private final QuoteAwardMapper quoteAwardMapper;
     private final PurchaseOrderService purchaseOrderService;
 
     @Override
     public PageResult<RfqVO> page(RfqQuery query) {
+        log.info("[RFQ-DEBUG] page query: supplierId={}, rfqStatus={}, keyword={}", query.getSupplierId(), query.getRfqStatus(), query.getKeyword());
+
         LambdaQueryWrapper<Rfq> wrapper = new LambdaQueryWrapper<Rfq>()
                 .eq(query.getRfqStatus() != null, Rfq::getRfqStatus, query.getRfqStatus())
                 .and(StringUtils.hasText(query.getKeyword()), w -> w
@@ -57,6 +66,30 @@ public class RfqServiceImpl implements RfqService {
                         .or()
                         .like(Rfq::getRfqTitle, query.getKeyword()))
                 .orderByDesc(Rfq::getCreateTime);
+
+        if (query.getSupplierId() != null) {
+            wrapper.ne(Rfq::getRfqStatus, RfqStatusEnum.DRAFT.getCode());
+            List<RfqSupplier> allSupplierRecords = rfqSupplierMapper.selectList(
+                    new LambdaQueryWrapper<RfqSupplier>()
+                            .eq(RfqSupplier::getSupplierId, query.getSupplierId()));
+            log.info("[RFQ-DEBUG] supplierId={} 的所有 rfq_supplier 记录数={}, 详情={}",
+                    query.getSupplierId(), allSupplierRecords.size(),
+                    allSupplierRecords.stream().map(r -> "rfqId=" + r.getRfqId() + ":inviteStatus=" + r.getInviteStatus()).collect(Collectors.toList()));
+
+            List<Long> invitedRfqIds = rfqSupplierMapper.selectList(
+                    new LambdaQueryWrapper<RfqSupplier>()
+                            .eq(RfqSupplier::getSupplierId, query.getSupplierId())
+                            .in(RfqSupplier::getInviteStatus, List.of(1, 2)))
+                    .stream()
+                    .map(RfqSupplier::getRfqId)
+                    .collect(Collectors.toList());
+            log.info("[RFQ-DEBUG] supplierId={} inviteStatus IN (1,2) 的 rfqIds={}", query.getSupplierId(), invitedRfqIds);
+            if (invitedRfqIds.isEmpty()) {
+                return PageResult.of(new Page<>(query.getPageNum(), query.getPageSize()));
+            }
+            wrapper.in(Rfq::getId, invitedRfqIds);
+        }
+
         Page<Rfq> page = rfqMapper.selectPage(new Page<>(query.getPageNum(), query.getPageSize()), wrapper);
         return PageResult.of(page.convert(RfqConverter::toVO));
     }
@@ -67,11 +100,26 @@ public class RfqServiceImpl implements RfqService {
         if (entity == null) {
             throw BusinessException.of(ResultCode.NOT_FOUND);
         }
+        LoginUser loginUser = SecurityUtils.getLoginUser();
+        if (loginUser != null && Integer.valueOf(2).equals(loginUser.getUserType())) {
+            Long supplierId = loginUser.getSupplierId();
+            if (supplierId == null) {
+                throw BusinessException.of(ResultCode.FORBIDDEN.getCode(), "供应商信息缺失，无法访问该询价单");
+            }
+            Long count = rfqSupplierMapper.selectCount(new LambdaQueryWrapper<RfqSupplier>()
+                    .eq(RfqSupplier::getRfqId, id)
+                    .eq(RfqSupplier::getSupplierId, supplierId)
+                    .in(RfqSupplier::getInviteStatus, List.of(1, 2)));
+            if (count == 0) {
+                throw BusinessException.of(ResultCode.FORBIDDEN.getCode(), "您未被邀请参与该询价单");
+            }
+        }
         return RfqConverter.toVO(entity);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "询价单", businessType = "rfq", action = "创建询价单", businessIdExpr = "#result", afterStatusExpr = "0")
     public Long create(RfqCreateDTO dto) {
         String rfqNo = dto.getRfqNo();
         if (!StringUtils.hasText(rfqNo)) {
@@ -121,6 +169,7 @@ public class RfqServiceImpl implements RfqService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "询价单", businessType = "rfq", action = "编辑询价单", businessIdExpr = "#id", beforeStatusExpr = "0", afterStatusExpr = "0")
     public void update(Long id, RfqUpdateDTO dto) {
         Rfq entity = rfqMapper.selectById(id);
         if (entity == null) {
@@ -135,6 +184,7 @@ public class RfqServiceImpl implements RfqService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "询价单", businessType = "rfq", action = "发布询价单", businessIdExpr = "#id", beforeStatusExpr = "0", afterStatusExpr = "1")
     public void publish(Long id) {
         Rfq entity = rfqMapper.selectById(id);
         if (entity == null) {
@@ -143,13 +193,34 @@ public class RfqServiceImpl implements RfqService {
         if (!RfqStatusEnum.DRAFT.getCode().equals(entity.getRfqStatus())) {
             throw BusinessException.of(ResultCode.STATUS_NOT_ALLOWED.getCode(), "只有草稿状态可发布");
         }
+
+        // 发布前检查该 RFQ 下有多少供应商被邀请
+        List<RfqSupplier> allBefore = rfqSupplierMapper.selectList(
+                new LambdaQueryWrapper<RfqSupplier>().eq(RfqSupplier::getRfqId, id));
+        log.info("[RFQ-DEBUG] publish rfqId={}, 发布前 rfq_supplier 记录数={}, 详情={}",
+                id, allBefore.size(),
+                allBefore.stream().map(r -> "supplierId=" + r.getSupplierId() + ":inviteStatus=" + r.getInviteStatus()).collect(Collectors.toList()));
+
         entity.setRfqStatus(RfqStatusEnum.PUBLISHED.getCode());
         entity.setPublishTime(LocalDateTime.now());
         rfqMapper.updateById(entity);
+
+        // 将已邀请供应商的状态从"待确认(0)"更新为"已确认(1)"，使供应商列表可见
+        List<RfqSupplier> invitedList = rfqSupplierMapper.selectList(
+                new LambdaQueryWrapper<RfqSupplier>()
+                        .eq(RfqSupplier::getRfqId, id)
+                        .eq(RfqSupplier::getInviteStatus, 0));
+        log.info("[RFQ-DEBUG] publish rfqId={}, inviteStatus=0 的记录数={}", id, invitedList.size());
+        for (RfqSupplier rs : invitedList) {
+            rs.setInviteStatus(1);
+            rfqSupplierMapper.updateById(rs);
+        }
+        log.info("[RFQ-DEBUG] publish rfqId={}, 已将 {} 条记录从 inviteStatus=0 更新为 1", id, invitedList.size());
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "询价单", businessType = "rfq", action = "截止询价", businessIdExpr = "#id", beforeStatusExpr = "2", afterStatusExpr = "3")
     public void close(Long id) {
         Rfq entity = rfqMapper.selectById(id);
         if (entity == null) {
@@ -165,6 +236,7 @@ public class RfqServiceImpl implements RfqService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "询价单", businessType = "rfq", action = "取消询价单", businessIdExpr = "#id", afterStatusExpr = "5")
     public void cancel(Long id) {
         Rfq entity = rfqMapper.selectById(id);
         if (entity == null) {
@@ -181,6 +253,7 @@ public class RfqServiceImpl implements RfqService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "询价单", businessType = "rfq", action = "定价确认", businessIdExpr = "#id", beforeStatusExpr = "3", afterStatusExpr = "4")
     public void price(Long id, PricingDTO dto) {
         Rfq rfq = rfqMapper.selectById(id);
         if (rfq == null) {

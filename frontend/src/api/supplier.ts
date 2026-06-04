@@ -2,6 +2,14 @@ import { request, type ApiPage } from '@/utils/request'
 import { asPage } from '@/utils/apiNormalize'
 import type { PageQuery, Supplier } from '@/types/business'
 
+export interface SupplierCategoryItem {
+  id: number | string
+  parentId?: number | string
+  categoryName: string
+  categoryCode: string
+  status: number
+}
+
 export const supplierApi = {
   page: async (params: PageQuery) => {
     const result = await request.get<ApiPage<Supplier>, ApiPage<Supplier>>('/v1/suppliers', { params })
@@ -12,4 +20,7 @@ export const supplierApi = {
     request.post<number, number>('/v1/suppliers', data, { headers }),
   update: (id: number | string, data: Record<string, unknown>, headers?: Record<string, string>) =>
     request.put<void, void>(`/v1/suppliers/${id}`, data, { headers }),
+  /** 获取所有启用的供应商品类列表 */
+  listCategories: () =>
+    request.get<SupplierCategoryItem[], SupplierCategoryItem[]>('/v1/supplier-categories/list'),
 }

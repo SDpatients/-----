@@ -1,9 +1,17 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import StatusTag from './StatusTag.vue'
 import OperationLogDrawer from './OperationLogDrawer.vue'
 import { useOperationLog } from '@/composables/useOperationLog'
 import type { OperationLogItem } from '@/types/operationLog'
+
+const props = withDefaults(defineProps<{
+  module?: string
+  businessNo?: string
+}>(), {
+  module: '',
+  businessNo: '',
+})
 
 const { loading, logs, loadLogs } = useOperationLog()
 const visible = ref(false)
@@ -14,7 +22,12 @@ const open = (row: OperationLogItem) => {
   visible.value = true
 }
 
-onMounted(() => loadLogs())
+const loadData = () => {
+  loadLogs({ module: props.module || undefined, businessNo: props.businessNo || undefined })
+}
+
+onMounted(loadData)
+watch(() => [props.module, props.businessNo], loadData)
 </script>
 
 <template>

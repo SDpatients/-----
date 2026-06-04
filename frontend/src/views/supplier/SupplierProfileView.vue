@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { supplierApi } from '@/api/supplier'
+import type { SupplierCategoryItem } from '@/api/supplier'
 import { qualificationApi } from '@/api/qualification'
 import { toSupplier } from '@/api/adapters'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -15,9 +16,10 @@ const userStore = useUserStore()
 const supplier = ref<Supplier | null>(null)
 const loading = ref(false)
 
-const supplierId = computed(() => {
+const isSupplierUser = computed(() => userStore.user?.userType === 'supplier')
+const supplierId = computed<string | null>(() => {
   const dept = userStore.user?.department
-  if (dept?.startsWith('供应商ID：')) return Number(dept.replace('供应商ID：', ''))
+  if (dept?.startsWith('供应商ID：')) return dept.replace('供应商ID：', '')
   return null
 })
 
@@ -34,7 +36,7 @@ const loadSupplier = async () => {
 }
 
 const loadAll = async () => {
-  if (!supplierId.value) return
+  if (!isSupplierUser.value && !supplierId.value) return
   await Promise.all([loadSupplier(), loadQualifications()])
 }
 
@@ -43,22 +45,71 @@ onMounted(loadAll)
 // ==================== 编辑功能 ====================
 const showEditDialog = ref(false)
 const editForm = reactive({
-  contactName: '', contactPhone: '', contactEmail: '', address: '',
+  supplierName: '',
+  supplierShortName: '',
+  categoryId: undefined as number | undefined,
+  supplierType: undefined as number | undefined,
+  creditCode: '',
+  legalPerson: '',
+  contactName: '',
+  contactPhone: '',
+  contactEmail: '',
+  province: '',
+  city: '',
+  district: '',
+  address: '',
+  bankName: '',
+  bankAccount: '',
+  taxNumber: '',
+  remark: '',
 })
 
-const openEdit = () => {
+const categoryList = ref<SupplierCategoryItem[]>([])
+
+/** 供应类型选项（与后端 enum 对齐） */
+const supplierTypeOptions = [
+  { value: 1, label: '原材料' },
+  { value: 2, label: '辅材' },
+  { value: 3, label: '设备' },
+  { value: 4, label: '服务' },
+  { value: 5, label: '其他' },
+]
+
+const openEdit = async () => {
   if (!supplier.value) return
-  editForm.contactName = supplier.value.contact
-  editForm.contactPhone = supplier.value.phone
-  editForm.contactEmail = (supplier.value as any).email || ''
-  editForm.address = supplier.value.address || ''
+  // 加载品类列表
+  try {
+    categoryList.value = await supplierApi.listCategories()
+  } catch { /* 非必须 */ }
+  const s = supplier.value
+  editForm.supplierName = s.name
+  editForm.supplierShortName = s.shortName || ''
+  editForm.categoryId = (s.categoryId as number | undefined) || undefined
+  editForm.supplierType = s.supplierType || undefined
+  editForm.creditCode = s.creditCode || ''
+  editForm.legalPerson = s.legalPerson || ''
+  editForm.contactName = s.contact || ''
+  editForm.contactPhone = s.phone || ''
+  editForm.contactEmail = s.contactEmail || ''
+  editForm.province = s.province || ''
+  editForm.city = s.city || ''
+  editForm.district = s.district || ''
+  editForm.address = s.address || ''
+  editForm.bankName = s.bankName || ''
+  editForm.bankAccount = s.bankAccount || ''
+  editForm.taxNumber = s.taxNumber || ''
+  editForm.remark = s.remark || ''
   showEditDialog.value = true
 }
 
 const submitEdit = async () => {
   if (!supplierId.value) return
+  if (!editForm.supplierName) {
+    ElMessage.warning('企业名称不能为空')
+    return
+  }
   try {
-    await supplierApi.update(supplierId.value, editForm)
+    await supplierApi.update(supplierId.value, editForm as unknown as Record<string, unknown>)
     ElMessage.success('资料更新成功')
     showEditDialog.value = false
     loadSupplier()
@@ -104,10 +155,12 @@ const qualStatusMap: Record<number, { text: string; type: string }> = {
 }
 
 const loadQualifications = async () => {
-  if (!supplierId.value) return
   qualLoading.value = true
   try {
-    const result = await qualificationApi.page({ supplierId: supplierId.value, pageNum: 1, pageSize: 100 })
+    // 供应商用户不传 supplierId，由后端从 token 中解析，避免前后端不一致导致"数据越权"
+    const params: any = { pageNum: 1, pageSize: 100 }
+    if (!isSupplierUser.value && supplierId.value) params.supplierId = supplierId.value
+    const result = await qualificationApi.page(params)
     qualifications.value = result.records
   } finally {
     qualLoading.value = false
@@ -188,6 +241,14 @@ const expiringQuals = computed(() => qualifications.value.filter(q => {
   return daysLeft > 0 && daysLeft <= q.remindDays
 }))
 const hasQualWarnings = computed(() => expiredQuals.value.length > 0 || expiringQuals.value.length > 0)
+
+/** 省市区合并显示 */
+const regionText = computed(() => {
+  const s = supplier.value
+  if (!s) return ''
+  const parts = [s.province, s.city, s.district].filter(Boolean)
+  return parts.length > 0 ? parts.join(' ') : ''
+})
 </script>
 
 <template>
@@ -197,15 +258,37 @@ const hasQualWarnings = computed(() => expiredQuals.value.length > 0 || expiring
     </template>
     <div v-loading="loading">
       <template v-if="supplier">
+        <!-- 基本信息区 -->
+        <div class="section-title">基本信息</div>
         <div class="detail-grid">
           <div class="detail-item"><div class="detail-label">企业名称</div><div class="detail-value">{{ supplier.name }}</div></div>
-          <div class="detail-item"><div class="detail-label">联系人</div><div class="detail-value">{{ supplier.contact }} / {{ supplier.phone }}</div></div>
+          <div class="detail-item"><div class="detail-label">企业简称</div><div class="detail-value">{{ supplier.shortName || '-' }}</div></div>
+          <div class="detail-item"><div class="detail-label">统一社会信用代码</div><div class="detail-value">{{ supplier.creditCode || '-' }}</div></div>
+          <div class="detail-item"><div class="detail-label">法定代表人</div><div class="detail-value">{{ supplier.legalPerson || '-' }}</div></div>
           <div class="detail-item"><div class="detail-label">供应品类</div><div class="detail-value">{{ supplier.category }}</div></div>
           <div class="detail-item"><div class="detail-label">状态</div><div class="detail-value"><StatusTag :value="supplier.status" /></div></div>
           <div class="detail-item"><div class="detail-label">等级</div><div class="detail-value">{{ supplier.level }}</div></div>
           <div class="detail-item"><div class="detail-label">绩效分</div><div class="detail-value">{{ supplier.performanceScore }}</div></div>
           <div class="detail-item"><div class="detail-label">风险等级</div><div class="detail-value"><StatusTag :value="supplier.riskLevel" kind="risk" /></div></div>
-          <div class="detail-item"><div class="detail-label">地址</div><div class="detail-value">{{ supplier.address }}</div></div>
+        </div>
+
+        <!-- 联系信息区 -->
+        <div class="section-title">联系信息</div>
+        <div class="detail-grid">
+          <div class="detail-item"><div class="detail-label">联系人</div><div class="detail-value">{{ supplier.contact }}</div></div>
+          <div class="detail-item"><div class="detail-label">联系电话</div><div class="detail-value">{{ supplier.phone }}</div></div>
+          <div class="detail-item"><div class="detail-label">邮箱</div><div class="detail-value">{{ supplier.contactEmail || '-' }}</div></div>
+          <div class="detail-item"><div class="detail-label">所在地区</div><div class="detail-value">{{ regionText || '-' }}</div></div>
+          <div class="detail-item" style="grid-column: span 2;"><div class="detail-label">详细地址</div><div class="detail-value">{{ supplier.address }}</div></div>
+        </div>
+
+        <!-- 财务信息区 -->
+        <div class="section-title">财务信息</div>
+        <div class="detail-grid">
+          <div class="detail-item"><div class="detail-label">开户银行</div><div class="detail-value">{{ supplier.bankName || '-' }}</div></div>
+          <div class="detail-item"><div class="detail-label">银行账号</div><div class="detail-value">{{ supplier.bankAccount || '-' }}</div></div>
+          <div class="detail-item"><div class="detail-label">纳税人识别号</div><div class="detail-value">{{ supplier.taxNumber || '-' }}</div></div>
+          <div class="detail-item" v-if="supplier.remark"><div class="detail-label">备注</div><div class="detail-value">{{ supplier.remark }}</div></div>
         </div>
       </template>
       <el-empty v-else description="暂无供应商资料" />
@@ -285,23 +368,120 @@ const hasQualWarnings = computed(() => expiredQuals.value.length > 0 || expiring
     </div>
 
     <el-divider>资料附件</el-divider>
-    <AttachmentPanel business-type="supplier" :business-id="supplierId ?? undefined" />
+    <AttachmentPanel business-type="supplier" :business-id="supplierId ?? undefined" :editable="true" />
 
-    <!-- 编辑资料弹窗 -->
-    <el-dialog v-model="showEditDialog" title="编辑供应商资料" width="520px" :close-on-click-modal="false">
-      <el-form :model="editForm" label-width="90px">
-        <el-form-item label="联系人">
-          <el-input v-model="editForm.contactName" placeholder="选填" />
+    <!-- 编辑资料弹窗（全字段） -->
+    <el-dialog v-model="showEditDialog" title="编辑供应商资料" width="680px" :close-on-click-modal="false">
+      <el-form :model="editForm" label-width="110px">
+        <!-- 基本信息 -->
+        <div class="form-section-label">基本信息</div>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="企业名称" required>
+              <el-input v-model="editForm.supplierName" placeholder="请输入企业名称" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="企业简称">
+              <el-input v-model="editForm.supplierShortName" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="统一社会信用代码">
+              <el-input v-model="editForm.creditCode" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="法定代表人">
+              <el-input v-model="editForm.legalPerson" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="供应品类">
+              <el-select v-model="editForm.categoryId" placeholder="请选择" style="width:100%" clearable>
+                <el-option v-for="cat in categoryList" :key="cat.id" :label="cat.categoryName" :value="cat.id" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="供应类型">
+              <el-select v-model="editForm.supplierType" placeholder="请选择" style="width:100%" clearable>
+                <el-option v-for="opt in supplierTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <!-- 联系信息 -->
+        <div class="form-section-label">联系信息</div>
+        <el-row :gutter="16">
+          <el-col :span="8">
+            <el-form-item label="联系人">
+              <el-input v-model="editForm.contactName" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="联系电话">
+              <el-input v-model="editForm.contactPhone" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="邮箱">
+              <el-input v-model="editForm.contactEmail" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="8">
+            <el-form-item label="省份">
+              <el-input v-model="editForm.province" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="城市">
+              <el-input v-model="editForm.city" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="区县">
+              <el-input v-model="editForm.district" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="详细地址">
+          <el-input v-model="editForm.address" type="textarea" :rows="1" placeholder="选填" />
         </el-form-item>
-        <el-form-item label="联系电话">
-          <el-input v-model="editForm.contactPhone" placeholder="选填" />
-        </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input v-model="editForm.contactEmail" placeholder="选填" />
-        </el-form-item>
-        <el-form-item label="地址">
-          <el-input v-model="editForm.address" type="textarea" :rows="2" placeholder="选填" />
-        </el-form-item>
+
+        <!-- 财务信息 -->
+        <div class="form-section-label">财务信息</div>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="开户银行">
+              <el-input v-model="editForm.bankName" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="银行账号">
+              <el-input v-model="editForm.bankAccount" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="纳税人识别号">
+              <el-input v-model="editForm.taxNumber" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="备注">
+              <el-input v-model="editForm.remark" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <template #footer>
         <el-button @click="showEditDialog = false">取消</el-button>
@@ -375,6 +555,22 @@ const hasQualWarnings = computed(() => expiredQuals.value.length > 0 || expiring
   font-size: 14px;
   font-weight: 600;
   color: #2c3e50;
+}
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 20px 0 10px;
+  padding-left: 10px;
+  border-left: 3px solid #409eff;
+}
+.form-section-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #409eff;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e8edf2;
 }
 .qual-section {
   background: #ffffff;

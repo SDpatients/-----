@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { logisticsApi } from '@/api/logistics'
 import { mockApi } from '@/api/mockApi'
 import { toAsn } from '@/api/adapters'
+import { toId } from '@/utils/id'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import ExportDialog from '@/components/business/ExportDialog.vue'
@@ -28,7 +29,10 @@ const loadData = async () => {
     if (query.keyword) params.keyword = query.keyword
     if (query.deliveryStatus !== undefined && query.deliveryStatus !== null) params.deliveryStatus = query.deliveryStatus
     const result = await logisticsApi.deliveryPage(params as any)
-    records.value = result.records.map(toAsn)
+    records.value = result.records.map(item => ({
+      ...toAsn(item),
+      rawStatus: item.deliveryStatus ?? item.status ?? 0,
+    }))
     total.value = result.total
     if (result.total === 0) query.pageNum = 1
   } finally {
@@ -70,8 +74,24 @@ const handleTriggerQuality = async (row: AsnNotice) => {
 
 const handlePrint = async (row: AsnNotice) => {
   try {
-    const lines = await mockApi.getDeliveryDetails(Number(row.id))
-    printLines.value = lines as unknown as DeliveryLineItem[]
+    const details = await mockApi.getDeliveryDetails(toId(row.id))
+    // 将后端字段映射为前端打印模板期望的字段
+    printLines.value = (details as any[]).map((d, idx) => ({
+      lineNo: idx + 1,
+      materialCode: d.materialCode,
+      materialName: d.materialName,
+      materialSpec: d.materialSpec,
+      orderLineNo: idx + 1,
+      unit: d.unit,
+      orderQty: d.planQty,
+      shippedQty: d.actualQty,
+      shipQty: d.actualQty,
+      batchNo: d.batchNo,
+      caseNo: d.caseNo || '',
+      qtyPerCase: d.qtyPerCase || 0,
+      barcode: d.barcode || '',
+      remark: d.remark || '',
+    }))
   } catch {
     printLines.value = []
   }
@@ -112,6 +132,7 @@ onMounted(loadData)
             <el-option label="已送达" :value="3" />
             <el-option label="已收货" :value="4" />
             <el-option label="已拒收" :value="5" />
+            <el-option label="质检中" :value="6" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -131,11 +152,8 @@ onMounted(loadData)
       <el-table-column label="操作" width="320" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="router.push(`/purchasing/asn/${row.id}`)">详情</el-button>
-          <el-button link type="success" @click="handleShip(row)">发货</el-button>
-          <el-button link type="warning" @click="handleArrive(row)">到达</el-button>
-          <el-button v-if="row.status === '已送达' || row.status === '已收货'" link type="info" @click="handleTriggerQuality(row)">质检</el-button>
-          <el-button v-if="row.status === '已收货'" link type="primary" @click="handleWarehousing(row)">入库</el-button>
-          <el-button link @click="handlePrint(row)">打印</el-button>
+          <el-button v-if="row.rawStatus === 1 || row.rawStatus === 2" link type="warning" @click="handleArrive(row)">到达</el-button>
+          <el-button v-if="row.rawStatus >= 3" link @click="handlePrint(row)">打印</el-button>
         </template>
       </el-table-column>
     </el-table>

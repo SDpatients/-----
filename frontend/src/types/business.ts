@@ -28,18 +28,32 @@ export interface Supplier {
   id: number | string
   code: string
   name: string
+  shortName?: string
   category: string
+  categoryId?: number | string
+  supplierType?: number
   level: string
   status: number
   contact: string
+  contactEmail?: string
   phone: string
+  legalPerson?: string
+  creditCode?: string
+  province?: string
+  city?: string
+  district?: string
   admissionStage: string
   performanceScore: number
   riskLevel: string
+  accountCount: number
   address: string
-  creditCode?: string
+  bankName?: string
+  bankAccount?: string
+  taxNumber?: string
+  remark?: string
   auditTime?: string
   auditRemark?: string
+  createdAt?: string
   blacklisted?: boolean
   blacklistReason?: string
   blacklistStartTime?: string
@@ -133,6 +147,8 @@ export interface AttachmentFile {
   uploader: string
   uploadedAt: string
   category: string
+  businessType?: string
+  businessId?: number | string
 }
 
 export interface ImportExportTask {
@@ -395,6 +411,7 @@ export interface RfqRecord {
   quoteDeadline: string
   rfqStatus: number
   publishTime: string
+  remark?: string
 }
 
 /** 供应商报价记录 */
@@ -403,14 +420,38 @@ export interface QuoteRecord {
   quoteNo: string
   rfqId: number | string
   rfqNo?: string
+  rfqTitle?: string
+  supplierId?: number | string
   supplierName: string
   currency: string
+  exchangeRate?: number
   totalAmount: number
   taxAmount: number
   quoteStatus: number
-  validUntil: string
-  remark: string
-  submitTime: string
+  negotiationRound?: number
+  paymentTerms?: string
+  validUntil?: string
+  remark?: string
+  submitTime?: string
+  createTime?: string
+}
+
+/** 询价单概要（用于报价对比页左侧列表） */
+export interface RfqSummaryRecord {
+  id: number | string
+  rfqNo: string
+  rfqTitle: string
+  currency: string
+  quoteDeadline?: string
+  rfqStatus: number
+  publishTime?: string
+  closeTime?: string
+  remark?: string
+  createTime?: string
+  /** 该询价单下的报价数量 */
+  quoteCount: number
+  /** 最后一次报价时间 */
+  latestQuoteTime?: string
 }
 
 /** NCR质量异常 */
@@ -558,6 +599,7 @@ export interface DeliveryLineItem {
   materialCode: string
   materialName: string
   orderLineNo: number
+  orderDetailId?: number | string | null
   unit: string
   orderQty: number
   shippedQty: number
@@ -643,6 +685,8 @@ export interface BargainRecord {
   fromUserName: string
   action: string // 'request_reprice' | 'resubmit' | 'accept' | 'reject'
   message: string
+  targetPrice?: number  // 采购方目标价
+  supplierPrice?: number  // 供应商报价
   createTime: string
 }
 

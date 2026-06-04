@@ -15,6 +15,7 @@ public interface SysFileAttachmentService {
     Long upload(MultipartFile file, String businessType, Long businessId, String businessNo) throws IOException;
     FileDownload load(Long id) throws IOException;
     void disable(Long id);
+    void rename(Long id, String fileName);
 
     record FileDownload(String fileName, String contentType, byte[] content) {}
 }

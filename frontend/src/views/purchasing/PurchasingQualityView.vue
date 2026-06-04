@@ -8,6 +8,7 @@ import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import ExportDialog from '@/components/business/ExportDialog.vue'
 import SupplierSelector from '@/components/business/SupplierSelector.vue'
+import { toId } from '@/utils/id'
 import type { NcrRecord, EightDReport, QualityAppeal } from '@/types/business'
 
 const router = useRouter()
@@ -37,11 +38,11 @@ const loadNcr = async () => {
 const resetNcr = () => { ncrQuery.keyword = ''; ncrQuery.ncrStatus = undefined; loadNcr() }
 
 const showNcrCreate = ref(false)
-const ncrForm = reactive({ supplierId: null as number | null, materialCode: '', materialName: '', unqualifiedQty: 0, problemDesc: '', severity: '中' })
+const ncrForm = reactive({ supplierId: null as string | null, materialCode: '', materialName: '', unqualifiedQty: 0, problemDesc: '', severity: 2 })
 
 const openNcrCreate = () => {
   ncrForm.supplierId = null; ncrForm.materialCode = ''; ncrForm.materialName = ''
-  ncrForm.unqualifiedQty = 0; ncrForm.problemDesc = ''; ncrForm.severity = '中'
+  ncrForm.unqualifiedQty = 0; ncrForm.problemDesc = ''; ncrForm.severity = 2
   showNcrCreate.value = true
 }
 
@@ -66,7 +67,8 @@ const handleMethodOptions = [
   { label: '退货', value: 1 },
   { label: '让步接收', value: 2 },
   { label: '挑选使用', value: 3 },
-  { label: '返工', value: 4 },
+  { label: '报废', value: 4 },
+  { label: '扣款', value: 5 },
 ]
 
 const openNcrHandle = (row: NcrRecord) => {
@@ -141,7 +143,7 @@ const submitD8 = async () => {
   if (!d8Form.ncrId) { ElMessage.warning('NCR ID不能为空'); return }
   if (!d8Form.supplierId) { ElMessage.warning('供应商不能为空'); return }
   try {
-    await eightDApi.create({ ncrId: Number(d8Form.ncrId), supplierId: d8Form.supplierId, dueDate: d8Form.dueDate || undefined })
+    await eightDApi.create({ ncrId: toId(d8Form.ncrId), supplierId: toId(d8Form.supplierId), dueDate: d8Form.dueDate || undefined })
     ElMessage.success('8D报告创建成功')
     showD8Create.value = false
     load8D()
@@ -229,11 +231,12 @@ onMounted(loadNcr)
             </el-form-item>
             <el-form-item label="状态">
               <el-select v-model="ncrQuery.ncrStatus" placeholder="全部" clearable style="width: 160px" @change="loadNcr">
-                <el-option label="创建" :value="0" />
-                <el-option label="已提交" :value="1" />
+                <el-option label="草稿" :value="0" />
+                <el-option label="已发布" :value="1" />
                 <el-option label="处理中" :value="2" />
-                <el-option label="验证中" :value="3" />
+                <el-option label="待验证" :value="3" />
                 <el-option label="已关闭" :value="4" />
+                <el-option label="已取消" :value="5" />
               </el-select>
             </el-form-item>
             <el-form-item>
@@ -287,9 +290,9 @@ onMounted(loadNcr)
             </el-form-item>
             <el-form-item label="严重度">
               <el-select v-model="ncrForm.severity" style="width: 100%">
-                <el-option label="高" value="高" />
-                <el-option label="中" value="中" />
-                <el-option label="低" value="低" />
+                <el-option label="一般" :value="1" />
+                <el-option label="严重" :value="2" />
+                <el-option label="重大" :value="3" />
               </el-select>
             </el-form-item>
             <el-form-item label="问题描述">
@@ -335,7 +338,7 @@ onMounted(loadNcr)
               <el-select v-model="d8Query.reportStatus" placeholder="全部" clearable style="width: 160px" @change="load8D">
                 <el-option label="草稿" :value="0" />
                 <el-option label="已提交" :value="1" />
-                <el-option label="审核通过" :value="2" />
+                <el-option label="审核中" :value="2" />
                 <el-option label="已退回" :value="3" />
                 <el-option label="已关闭" :value="4" />
               </el-select>

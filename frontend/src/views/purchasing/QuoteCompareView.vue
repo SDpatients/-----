@@ -4,65 +4,91 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { quoteApi, rfqApi } from '@/api/sourcing'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
-import type { QuoteRecord, RfqRecord, RfqLineItem, QuoteLineItem } from '@/types/business'
+import type { QuoteRecord, RfqRecord, RfqLineItem, QuoteLineItem, RfqSummaryRecord } from '@/types/business'
 
 const loading = ref(false)
-const rfqLoading = ref(false)
 
-// 报价列表
-const records = ref<QuoteRecord[]>([])
-const total = ref(0)
-const query = reactive({ pageNum: 1, pageSize: 10, keyword: '', quoteStatus: undefined as number | undefined })
+const rfqRecords = ref<RfqSummaryRecord[]>([])
+const query = reactive({ rfqNo: '', rfqTitle: '' })
 
-// 比价面板
-const compareVisible = ref(false)
-const compareLoading = ref(false)
-const compareRfq = ref<RfqRecord | null>(null)
-const compareRfqLines = ref<RfqLineItem[]>([])
-// key: rfqLineId, value: { supplierName, quoteLine }[]
-const compareData = ref<Record<number, { quoteId: number | string; supplierName: string; quoteLine: QuoteLineItem; totalAmount: number; taxAmount: number; quoteStatus: number }[]>>({})
-const supplierNames = ref<string[]>([])
+// 报价缓存 & 展开行 key 集合
+const quoteCache = ref<Record<number | string, QuoteRecord[]>>({})
+const quoteLoading = ref<Record<number | string, boolean>>({})
+const expandedIds = ref<Set<number | string>>(new Set())
+
+const isExpanded = (id: number | string) => expandedIds.value.has(id)
+
+const toggleExpand = (row: RfqSummaryRecord) => {
+  if (expandedIds.value.has(row.id)) {
+    expandedIds.value.delete(row.id)
+  } else {
+    expandedIds.value = new Set([...expandedIds.value, row.id])
+    loadQuotesIfNeeded(row.id as number)
+  }
+}
+
+const loadQuotesIfNeeded = async (rfqId: number) => {
+  if (quoteCache.value[rfqId]) return
+  quoteLoading.value[rfqId] = true
+  try {
+    const result = await quoteApi.page({ pageNum: 1, pageSize: 100, rfqId } as any)
+    quoteCache.value[rfqId] = result.records
+  } catch {
+    quoteCache.value[rfqId] = []
+  } finally {
+    quoteLoading.value[rfqId] = false
+  }
+}
 
 const loadData = async () => {
   loading.value = true
   try {
-    const params: Record<string, unknown> = { pageNum: query.pageNum, pageSize: query.pageSize }
-    if (query.keyword) params.keyword = query.keyword
-    if (query.quoteStatus !== undefined && query.quoteStatus !== null) params.quoteStatus = query.quoteStatus
-    const result = await quoteApi.page(params as any)
-    records.value = result.records
-    total.value = result.total
-    if (result.total === 0) query.pageNum = 1
-  } finally { loading.value = false }
+    const list = await quoteApi.listRfqWithQuotes()
+    let filtered = list
+    if (query.rfqNo) {
+      filtered = filtered.filter(r => (r.rfqNo || '').includes(query.rfqNo))
+    }
+    if (query.rfqTitle) {
+      filtered = filtered.filter(r => (r.rfqTitle || '').includes(query.rfqTitle))
+    }
+    rfqRecords.value = filtered
+    // 默认全部展开并加载报价
+    expandedIds.value = new Set(filtered.map(r => r.id))
+    filtered.forEach(r => loadQuotesIfNeeded(r.id as number))
+  } finally {
+    loading.value = false
+  }
 }
 
 const resetQuery = () => {
-  query.keyword = ''
-  query.quoteStatus = undefined
+  query.rfqNo = ''
+  query.rfqTitle = ''
   loadData()
 }
 
-/* ==================== 打开横向比价 ==================== */
+/* ==================== 横向比价 ==================== */
+const compareVisible = ref(false)
+const compareLoading = ref(false)
+const compareRfq = ref<RfqRecord | null>(null)
+const compareRfqLines = ref<RfqLineItem[]>([])
+const compareData = ref<Record<number, { quoteId: number | string; supplierName: string; quoteLine: QuoteLineItem; totalAmount: number; taxAmount: number; quoteStatus: number }[]>>({})
+
 const openCompare = async (row: QuoteRecord) => {
   compareVisible.value = true
   compareLoading.value = true
   compareData.value = {}
-  supplierNames.value = []
   try {
     compareRfq.value = await rfqApi.detail(row.rfqId)
     compareRfqLines.value = await rfqApi.lines(row.rfqId)
-    const quoteResult = await quoteApi.page({ pageNum: 1, pageSize: 100, keyword: '' })
-    const rfqQuotes = quoteResult.records.filter(q => q.rfqId === row.rfqId)
+    const quoteResult = await quoteApi.page({ pageNum: 1, pageSize: 100, rfqId: row.rfqId as number } as any)
+    const rfqQuotes = quoteResult.records
 
-    const nameSet = new Set<string>()
     const data: typeof compareData.value = {}
-
     for (const line of compareRfqLines.value) {
       data[line.id as number] = []
     }
 
     for (const quote of rfqQuotes) {
-      nameSet.add(quote.supplierName)
       try {
         const lines = await quoteApi.lines(quote.id)
         for (const ql of lines) {
@@ -81,7 +107,6 @@ const openCompare = async (row: QuoteRecord) => {
       } catch { /* ignore */ }
     }
 
-    supplierNames.value = Array.from(nameSet)
     compareData.value = data
   } catch {
     compareRfq.value = null
@@ -94,21 +119,21 @@ const openCompare = async (row: QuoteRecord) => {
 
 /* ==================== 最低价高亮 ==================== */
 const minPriceMap = computed(() => {
-  const map: Record<number, number> = {}
+  const map: Record<string, number> = {}
   for (const [lineId, entries] of Object.entries(compareData.value)) {
     const prices = entries.filter(e => e.quoteStatus === 1).map(e => e.quoteLine.unitPrice)
     if (prices.length > 0) {
-      map[Number(lineId)] = Math.min(...prices)
+      map[lineId] = Math.min(...prices)
     }
   }
   return map
 })
 
-const isLowestPrice = (lineId: number, unitPrice: number, quoteStatus: number) => {
-  return quoteStatus === 1 && minPriceMap.value[lineId] === unitPrice
+const isLowestPrice = (lineId: number | string, unitPrice: number, quoteStatus: number) => {
+  return quoteStatus === 1 && minPriceMap.value[String(lineId)] === unitPrice
 }
 
-/* ==================== 排序筛选 ==================== */
+/* ==================== 排序 ==================== */
 const sortBy = ref<'unitPrice' | 'deliveryDate' | ''>('')
 const sortOrder = ref<'asc' | 'desc'>('asc')
 
@@ -121,12 +146,13 @@ const toggleSort = (key: 'unitPrice' | 'deliveryDate') => {
   }
 }
 
-/* ==================== 操作 ==================== */
+/* ==================== 报价操作 ==================== */
 const handleAdopt = async (row: QuoteRecord) => {
   try {
     await ElMessageBox.confirm(`确认采纳报价 ${row.quoteNo}？`, '确认采纳')
     await quoteApi.adopt(row.id)
     ElMessage.success('已采纳')
+    delete quoteCache.value[row.rfqId]
     loadData()
   } catch { /* cancel */ }
 }
@@ -136,6 +162,7 @@ const handleReject = async (row: QuoteRecord) => {
     await ElMessageBox.confirm(`确认不采纳报价 ${row.quoteNo}？`, '确认不采纳')
     await quoteApi.reject(row.id)
     ElMessage.success('已标记为不采纳')
+    delete quoteCache.value[row.rfqId]
     loadData()
   } catch { /* cancel */ }
 }
@@ -163,19 +190,29 @@ onMounted(loadData)
 </script>
 
 <template>
-  <PageContainer title="报价对比" subtitle="横向比价：按物料行对比各家供应商单价、总额、交期、付款条件">
+  <PageContainer title="报价对比" subtitle="按询价单分组，展开查看该询价下所有供应商报价">
+    <!-- 搜索面板 -->
     <div class="search-panel">
       <el-form inline :model="query" @submit.prevent="loadData">
-        <el-form-item label="关键词">
-          <el-input v-model="query.keyword" placeholder="报价单号/询价单号" clearable @clear="loadData" @keyup.enter="loadData" />
+        <el-form-item label="询价单号">
+          <el-input
+            v-model="query.rfqNo"
+            placeholder="请输入询价单号"
+            clearable
+            style="width: 200px"
+            @clear="loadData"
+            @keyup.enter="loadData"
+          />
         </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="query.quoteStatus" placeholder="全部" clearable style="width: 160px" @change="loadData">
-            <el-option label="草稿" :value="0" />
-            <el-option label="已提交" :value="1" />
-            <el-option label="已采纳" :value="2" />
-            <el-option label="未采纳" :value="3" />
-          </el-select>
+        <el-form-item label="询价标题">
+          <el-input
+            v-model="query.rfqTitle"
+            placeholder="请输入询价标题关键词"
+            clearable
+            style="width: 220px"
+            @clear="loadData"
+            @keyup.enter="loadData"
+          />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="loadData">查询</el-button>
@@ -183,35 +220,71 @@ onMounted(loadData)
         </el-form-item>
       </el-form>
     </div>
-    <el-table v-loading="loading" :data="records" border highlight-current-row>
-      <el-table-column prop="quoteNo" label="报价单号" width="170" />
-      <el-table-column prop="rfqNo" label="询价单号" width="170" />
-      <el-table-column prop="supplierName" label="供应商" min-width="180" />
-      <el-table-column prop="currency" label="币种" width="80" />
-      <el-table-column prop="totalAmount" label="总金额" width="130">
-        <template #default="{ row }">{{ row.totalAmount?.toLocaleString() }}</template>
-      </el-table-column>
-      <el-table-column prop="taxAmount" label="税额" width="120">
-        <template #default="{ row }">{{ row.taxAmount?.toLocaleString() }}</template>
-      </el-table-column>
-      <el-table-column label="状态" width="100">
-        <template #default="{ row }"><StatusTag :value="row.quoteStatus" prefix="QT" /></template>
-      </el-table-column>
-      <el-table-column prop="submitTime" label="提交时间" width="170" />
-      <el-table-column label="操作" width="280" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-          <el-button link type="warning" @click="openCompare(row)">横向比价</el-button>
-          <el-button v-if="row.quoteStatus === 1" link type="success" @click="handleAdopt(row)">采纳</el-button>
-          <el-button v-if="row.quoteStatus === 1" link type="danger" @click="handleReject(row)">不采纳</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <el-pagination
-      v-model:current-page="query.pageNum" v-model:page-size="query.pageSize"
-      :total="total" layout="total, prev, pager, next, sizes" class="mt-4"
-      @current-change="() => { if (!loading) loadData() }" @size-change="() => { if (!loading) loadData() }"
-    />
+
+    <!-- 询价单卡片列表 -->
+    <div v-loading="loading" class="rfq-card-list">
+      <div v-for="rfq in rfqRecords" :key="rfq.id" class="rfq-card" :class="{ 'rfq-card--expanded': isExpanded(rfq.id) }">
+        <!-- 卡片头部：询价单摘要 -->
+        <div class="rfq-card__header" @click="toggleExpand(rfq)">
+          <div class="rfq-card__header-left">
+            <el-icon class="rfq-card__arrow" :class="{ 'is-expanded': isExpanded(rfq.id) }">
+              <svg viewBox="0 0 1024 1024" width="16" height="16"><path d="M340.864 128.704L688 512 340.864 895.296a32 32 0 0 0 46.72 43.776l371.84-406.528a32 32 0 0 0 0-43.776L387.584 82.944a32 32 0 0 0-46.72 43.776z" fill="currentColor" /></svg>
+            </el-icon>
+            <span class="rfq-card__no">{{ rfq.rfqNo }}</span>
+            <span class="rfq-card__title">{{ rfq.rfqTitle }}</span>
+          </div>
+          <div class="rfq-card__header-right">
+            <StatusTag :value="rfq.rfqStatus" prefix="RFQ" />
+            <el-tag :type="rfq.quoteCount > 0 ? 'success' : 'info'" effect="plain" size="small">
+              {{ rfq.quoteCount }} 份报价
+            </el-tag>
+            <span v-if="rfq.currency" class="rfq-card__meta">{{ rfq.currency }}</span>
+            <span v-if="rfq.latestQuoteTime" class="rfq-card__meta">最新报价 {{ rfq.latestQuoteTime }}</span>
+            <span v-if="rfq.quoteDeadline" class="rfq-card__meta rfq-card__meta--deadline">截止 {{ rfq.quoteDeadline }}</span>
+          </div>
+        </div>
+
+        <!-- 展开区域：供应商报价表 -->
+        <transition name="rfq-expand">
+          <div v-if="isExpanded(rfq.id)" class="rfq-card__body">
+            <div v-loading="quoteLoading[rfq.id]">
+              <el-table
+                v-if="(quoteCache[rfq.id] || []).length > 0"
+                :data="quoteCache[rfq.id]"
+                border
+                size="small"
+                class="quote-table"
+              >
+                <el-table-column prop="quoteNo" label="报价单号" width="170" />
+                <el-table-column prop="supplierName" label="供应商" min-width="160" />
+                <el-table-column prop="currency" label="币种" width="80" align="center" />
+                <el-table-column prop="totalAmount" label="总金额" width="130" align="right">
+                  <template #default="{ row: r }">{{ r.totalAmount?.toLocaleString() }}</template>
+                </el-table-column>
+                <el-table-column prop="taxAmount" label="税额" width="110" align="right">
+                  <template #default="{ row: r }">{{ r.taxAmount?.toLocaleString() }}</template>
+                </el-table-column>
+                <el-table-column label="状态" width="100" align="center">
+                  <template #default="{ row: r }"><StatusTag :value="r.quoteStatus" prefix="QT" /></template>
+                </el-table-column>
+                <el-table-column prop="submitTime" label="提交时间" width="170" />
+                <el-table-column label="操作" width="280" fixed="right">
+                  <template #default="{ row: r }">
+                    <el-button link type="primary" @click.stop="openDetail(r)">详情</el-button>
+                    <el-button link type="warning" @click.stop="openCompare(r)">横向比价</el-button>
+                    <el-button v-if="r.quoteStatus === 1" link type="success" @click.stop="handleAdopt(r)">采纳</el-button>
+                    <el-button v-if="r.quoteStatus === 1" link type="danger" @click.stop="handleReject(r)">不采纳</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <el-empty v-else-if="!quoteLoading[rfq.id]" description="该询价单暂无报价" :image-size="60" />
+            </div>
+          </div>
+        </transition>
+      </div>
+
+      <el-empty v-if="!loading && rfqRecords.length === 0" description="未找到匹配的询价单" />
+    </div>
 
     <!-- ==================== 横向比价弹窗 ==================== -->
     <el-dialog v-model="compareVisible" title="横向比价" width="1000px" fullscreen destroy-on-close>
@@ -224,7 +297,6 @@ onMounted(loadData)
         <el-divider />
 
         <div v-loading="compareLoading">
-          <!-- 按行展开的比价表 -->
           <div v-for="line in compareRfqLines" :key="line.id" class="compare-row-block">
             <div class="line-header">
               <span class="line-no">#{{ line.lineNo }}</span>
@@ -280,6 +352,8 @@ onMounted(loadData)
       <template v-if="detailRow">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="报价单号">{{ detailRow.quoteNo }}</el-descriptions-item>
+          <el-descriptions-item label="询价单号">{{ detailRow.rfqNo || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="询价标题" :span="2">{{ detailRow.rfqTitle || '-' }}</el-descriptions-item>
           <el-descriptions-item label="供应商">{{ detailRow.supplierName }}</el-descriptions-item>
           <el-descriptions-item label="币种">{{ detailRow.currency }}</el-descriptions-item>
           <el-descriptions-item label="总金额">{{ detailRow.totalAmount?.toLocaleString() }}</el-descriptions-item>
@@ -312,6 +386,125 @@ onMounted(loadData)
 </template>
 
 <style scoped>
+.search-panel {
+  margin-bottom: 16px;
+}
+
+/* ========== 询价单卡片列表 ========== */
+.rfq-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rfq-card {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+.rfq-card:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+.rfq-card--expanded {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border-color: #c6e2ff;
+}
+
+/* 卡片头部 */
+.rfq-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  cursor: pointer;
+  user-select: none;
+  gap: 16px;
+  transition: background 0.15s;
+}
+.rfq-card__header:hover {
+  background: #f5f7fa;
+}
+
+.rfq-card__header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.rfq-card__arrow {
+  color: #909399;
+  transition: transform 0.25s;
+  flex-shrink: 0;
+}
+.rfq-card__arrow.is-expanded {
+  transform: rotate(90deg);
+}
+
+.rfq-card__no {
+  font-weight: 600;
+  color: #409eff;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.rfq-card__title {
+  color: #303133;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rfq-card__header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.rfq-card__meta {
+  font-size: 12px;
+  color: #909399;
+  white-space: nowrap;
+}
+.rfq-card__meta--deadline {
+  color: #e6a23c;
+}
+
+/* 卡片展开区域 */
+.rfq-card__body {
+  padding: 0 20px 16px;
+  border-top: 1px solid #f0f2f5;
+}
+
+.quote-table {
+  margin-top: 12px;
+}
+
+/* 展开动画 */
+.rfq-expand-enter-active,
+.rfq-expand-leave-active {
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+.rfq-expand-enter-from,
+.rfq-expand-leave-to {
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.rfq-expand-enter-to,
+.rfq-expand-leave-from {
+  opacity: 1;
+  max-height: 600px;
+}
+
+/* ========== 横向比价弹窗 ========== */
 .compare-info {
   font-size: 14px;
   color: #606266;

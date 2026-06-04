@@ -2,6 +2,13 @@ import { request, type ApiPage } from '@/utils/request'
 import { asPage } from '@/utils/apiNormalize'
 import type { PageQuery, NcrRecord, EightDReport, QualityAppeal } from '@/types/business'
 
+export interface NcrActionDTO {
+  remark?: string
+  handleMethod?: number
+  handleDetail?: string
+  handleRemark?: string
+}
+
 export interface EightDActionDTO {
   remark?: string
   currentStep?: number
@@ -21,14 +28,14 @@ export const ncrApi = {
 
   create: (data: Record<string, unknown>) => request.post<number, number>('/v1/nonconformance-reports', data),
 
-  submit: (id: number | string) => request.post<void, void>(`/v1/nonconformance-reports/${id}/submit`),
+  submit: (id: number | string, data?: NcrActionDTO) => request.post<void, void>(`/v1/nonconformance-reports/${id}/submit`, data || {}),
 
-  handle: (id: number | string, data: Record<string, unknown>) =>
+  handle: (id: number | string, data: NcrActionDTO) =>
     request.post<void, void>(`/v1/nonconformance-reports/${id}/handle`, data),
 
-  verify: (id: number | string) => request.post<void, void>(`/v1/nonconformance-reports/${id}/verify`),
+  verify: (id: number | string, data?: NcrActionDTO) => request.post<void, void>(`/v1/nonconformance-reports/${id}/verify`, data || {}),
 
-  close: (id: number | string) => request.post<void, void>(`/v1/nonconformance-reports/${id}/close`),
+  close: (id: number | string, data?: NcrActionDTO) => request.post<void, void>(`/v1/nonconformance-reports/${id}/close`, data || {}),
 }
 
 export const eightDApi = {

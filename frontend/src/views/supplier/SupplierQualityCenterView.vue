@@ -6,6 +6,7 @@ import { qualityApi } from '@/api/quality'
 import { ncrApi, eightDApi, qualityAppealApi } from '@/api/qualityExtra'
 import type { QualityAppealAuditDTO } from '@/api/qualityExtra'
 import { toQuality } from '@/api/adapters'
+import { toId } from '@/utils/id'
 import PageContainer from '@/components/common/PageContainer.vue'
 import AttachmentPanel from '@/components/business/AttachmentPanel.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
@@ -81,7 +82,7 @@ const handleNcr = async (row: NcrRecord) => {
     // 待处理 → 开始处理
     try {
       await ElMessageBox.confirm(`确认开始处理「${row.ncrNo}」？`, '开始处理', { type: 'info' })
-      await ncrApi.handle(row.id, { ncrStatus: 1 })
+      await ncrApi.handle(row.id, { handleRemark: '开始处理' })
       ElMessage.success('已开始处理')
       loadNcr()
     } catch { /* 取消 */ }
@@ -121,13 +122,13 @@ const resetEightD = () => { eightDQuery.keyword = ''; loadEightD() }
 // 8D 创建/编辑弹窗
 const eightDDialogVisible = ref(false)
 const eightDDialogTitle = ref('创建8D报告')
-const eightDForm = reactive({ ncrId: 0, supplierId: null as number | null, dueDate: '', reportStatus: 0 })
-const editingEightDId = ref(0)
+const eightDForm = reactive({ ncrId: '' as string | number, supplierId: null as number | null, dueDate: '', reportStatus: 0 })
+const editingEightDId = ref<string | number>(0)
 
 const openCreateEightD = () => {
   editingEightDId.value = 0
   eightDDialogTitle.value = '创建8D报告'
-  eightDForm.ncrId = 0
+  eightDForm.ncrId = ''
   eightDForm.supplierId = null
   eightDForm.dueDate = ''
   eightDForm.reportStatus = 0
@@ -135,9 +136,9 @@ const openCreateEightD = () => {
 }
 
 const openEditEightD = (row: EightDReport) => {
-  editingEightDId.value = Number(row.id)
+  editingEightDId.value = toId(row.id)
   eightDDialogTitle.value = '编辑8D报告'
-  eightDForm.ncrId = Number(row.ncrId)
+  eightDForm.ncrId = toId(row.ncrId)
   eightDForm.dueDate = row.dueDate
   eightDForm.reportStatus = row.reportStatus
   eightDDialogVisible.value = true
@@ -197,10 +198,10 @@ const resetAppeal = () => { appealQuery.keyword = ''; loadAppeal() }
 
 // 申诉创建弹窗
 const appealDialogVisible = ref(false)
-const appealForm = reactive({ ncrId: 0, supplierId: null as number | null, appealReason: '' })
+const appealForm = reactive({ ncrId: '' as string | number, supplierId: null as number | null, appealReason: '' })
 
 const openCreateAppeal = () => {
-  appealForm.ncrId = 0
+  appealForm.ncrId = ''
   appealForm.supplierId = null
   appealForm.appealReason = ''
   appealDialogVisible.value = true
@@ -301,10 +302,12 @@ onMounted(loadInsp)
             </el-form-item>
             <el-form-item label="状态">
               <el-select v-model="ncrQuery.ncrStatus" placeholder="全部" clearable style="width: 160px" @change="loadNcr">
-                <el-option label="待处理" :value="0" />
-                <el-option label="处理中" :value="1" />
-                <el-option label="待审核" :value="2" />
-                <el-option label="已关闭" :value="3" />
+                <el-option label="草稿" :value="0" />
+                <el-option label="已发布" :value="1" />
+                <el-option label="处理中" :value="2" />
+                <el-option label="待验证" :value="3" />
+                <el-option label="已关闭" :value="4" />
+                <el-option label="已取消" :value="5" />
               </el-select>
             </el-form-item>
             <el-form-item>

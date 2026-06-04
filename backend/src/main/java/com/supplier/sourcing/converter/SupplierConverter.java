@@ -1,6 +1,7 @@
 package com.supplier.sourcing.converter;
 
 import com.supplier.sourcing.dto.SupplierCreateDTO;
+import com.supplier.sourcing.dto.SupplierUpdateDTO;
 import com.supplier.sourcing.entity.SupplierInfo;
 import com.supplier.sourcing.enums.SupplierStatusEnum;
 import com.supplier.sourcing.vo.SupplierVO;
@@ -24,6 +25,26 @@ public class SupplierConverter {
         entity.setStatus(SupplierStatusEnum.APPROVED.getCode());
         entity.setRating(0);
         return entity;
+    }
+
+    public static void updateEntity(SupplierUpdateDTO dto, SupplierInfo entity) {
+        entity.setSupplierName(dto.getSupplierName());
+        entity.setSupplierShortName(dto.getSupplierShortName());
+        entity.setCategoryId(dto.getCategoryId());
+        entity.setSupplierType(dto.getSupplierType());
+        entity.setCreditCode(dto.getCreditCode());
+        entity.setLegalPerson(dto.getLegalPerson());
+        entity.setContactName(dto.getContactName());
+        entity.setContactPhone(dto.getContactPhone());
+        entity.setContactEmail(dto.getContactEmail());
+        entity.setProvince(dto.getProvince());
+        entity.setCity(dto.getCity());
+        entity.setDistrict(dto.getDistrict());
+        entity.setAddress(dto.getAddress());
+        entity.setBankName(dto.getBankName());
+        entity.setBankAccount(dto.getBankAccount());
+        entity.setTaxNumber(dto.getTaxNumber());
+        entity.setRemark(dto.getRemark());
     }
 
     public static SupplierVO toVO(SupplierInfo entity) {

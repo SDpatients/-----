@@ -20,6 +20,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+import java.util.Map;
+
 @Validated
 @RestController
 @RequestMapping("/v1/quality-inspections")
@@ -39,10 +42,23 @@ public class QualityInspectionController {
         return Result.success(qualityInspectionService.getDetail(id));
     }
 
+    @GetMapping("/{id}/lines")
+    @PreAuthorize("isAuthenticated()")
+    public Result<List<Map<String, Object>>> lines(@PathVariable @NotNull(message = "质检单ID不能为空") Long id) {
+        return Result.success(qualityInspectionService.getLines(id));
+    }
+
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public Result<Long> create(@Valid @RequestBody QualityInspectionCreateDTO dto) {
         return Result.success(qualityInspectionService.create(dto));
+    }
+
+    @PostMapping("/from-receipt/{receiptId}")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Long> createFromReceipt(@PathVariable @NotNull(message = "收货记录ID不能为空") Long receiptId,
+                                          @RequestBody Map<String, Object> data) {
+        return Result.success(qualityInspectionService.createFromReceipt(receiptId, data));
     }
 
     @PostMapping("/{id}/submit")

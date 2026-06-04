@@ -2,7 +2,7 @@ package com.supplier.sourcing.dto;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Data
 public class SupplierQualificationUpdateDTO {
@@ -11,8 +11,8 @@ public class SupplierQualificationUpdateDTO {
     private String qualName;
     private String qualNo;
     private String qualOrg;
-    private LocalDateTime validStart;
-    private LocalDateTime validEnd;
+    private LocalDate validStart;
+    private LocalDate validEnd;
     private Long fileId;
     private Integer status;
     private Integer remindDays;

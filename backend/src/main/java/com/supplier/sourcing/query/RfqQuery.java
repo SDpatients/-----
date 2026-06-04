@@ -16,4 +16,5 @@ public class RfqQuery {
 
     private String keyword;
     private Integer rfqStatus;
+    private Long supplierId;
 }

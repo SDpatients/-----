@@ -3,13 +3,13 @@ import { asPage } from '@/utils/apiNormalize'
 import type { VmiInventoryItem, ForecastDemandItem, PageQuery } from '@/types/business'
 
 export interface VmiInventoryQuery extends PageQuery {
-  supplierId?: number
+  supplierId?: number | string
   materialCode?: string
   inventoryStatus?: number
 }
 
 export interface VmiInventorySyncDTO {
-  supplierId: number
+  supplierId: number | string
   materialCode: string
   warehouseId?: number
   warehouseName?: string

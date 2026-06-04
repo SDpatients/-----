@@ -2,6 +2,7 @@ package com.supplier.sourcing.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.supplier.common.annotation.AuditLog;
 import com.supplier.common.exception.BusinessException;
 import com.supplier.common.result.PageResult;
 import com.supplier.common.result.ResultCode;
@@ -60,6 +61,7 @@ public class RfqSupplierServiceImpl implements RfqSupplierService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "询价单", businessType = "rfq_supplier", action = "邀请供应商", businessIdExpr = "#rfqId")
     public void inviteSuppliers(Long rfqId, List<Long> supplierIds) {
         List<Long> existingIds = rfqSupplierMapper.selectList(
                 new LambdaQueryWrapper<RfqSupplier>()
@@ -103,6 +105,7 @@ public class RfqSupplierServiceImpl implements RfqSupplierService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "询价单", businessType = "rfq_supplier", action = "移除供应商", businessIdExpr = "#id")
     public void delete(Long id) {
         RfqSupplier entity = rfqSupplierMapper.selectById(id);
         if (entity == null) {

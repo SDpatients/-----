@@ -5,6 +5,14 @@ import { attachmentApi } from '@/api/attachment'
 import { useAttachment } from '@/composables/useAttachment'
 import type { UploadRawFile } from 'element-plus'
 
+const props = withDefaults(defineProps<{
+  businessType?: string
+  businessId?: number | string
+}>(), {
+  businessType: 'supplier',
+  businessId: '',
+})
+
 const fileList = ref<UploadUserFile[]>([])
 const progress = ref(0)
 const uploading = ref(false)
@@ -22,7 +30,9 @@ const submit = async () => {
   uploading.value = true
   progress.value = 68
   if (rawFile) {
-    await attachmentApi.uploadBinary(rawFile as unknown as File, 'purchase_order', 1)
+    // 19 位雪花 ID 必须按字符串透传，避免 Number() 精度丢失
+    const businessId = props.businessId !== '' && props.businessId != null ? String(props.businessId) : undefined
+    await attachmentApi.uploadBinary(rawFile as unknown as File, props.businessType, businessId)
   }
   progress.value = 100
   uploading.value = false

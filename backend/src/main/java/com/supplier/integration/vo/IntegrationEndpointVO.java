@@ -1,10 +1,13 @@
 package com.supplier.integration.vo;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 @Data
 public class IntegrationEndpointVO {
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
     private String endpointCode;
     private String endpointName;

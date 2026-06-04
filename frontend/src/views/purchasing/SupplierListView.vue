@@ -2,7 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowDown } from '@element-plus/icons-vue'
+import { ArrowDown, Edit } from '@element-plus/icons-vue'
 import { supplierApi } from '@/api/supplier'
 import { blacklistApi } from '@/api/blacklist'
 import { getIdempotentHeaders } from '@/utils/idempotent'
@@ -10,6 +10,7 @@ import { toSupplier } from '@/api/adapters'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import ExportDialog from '@/components/business/ExportDialog.vue'
+import SupplierAccountDialog from './SupplierAccountDialog.vue'
 import type { Supplier } from '@/types/business'
 
 const router = useRouter()
@@ -18,6 +19,20 @@ const records = ref<Supplier[]>([])
 const total = ref(0)
 const exportVisible = ref(false)
 const query = reactive({ pageNum: 1, pageSize: 10, keyword: '', status: undefined as number | undefined, includeBlacklisted: false })
+
+const accountDialogVisible = ref(false)
+const accountSupplierId = ref<number | string>('')
+const accountSupplierName = ref('')
+
+const openAccountDialog = (row: Supplier) => {
+  accountSupplierId.value = row.id
+  accountSupplierName.value = row.name
+  accountDialogVisible.value = true
+}
+
+const onAccountChanged = () => {
+  loadData()
+}
 
 // 状态链定义
 const statusChain = [
@@ -146,6 +161,53 @@ const submitCreate = async () => {
 }
 
 onMounted(loadData)
+
+// ==================== 编辑供应商 ====================
+const showEditDialog = ref(false)
+const editFormRef = ref()
+const editForm = reactive({
+  supplierName: '', supplierShortName: '', supplierType: undefined as number | undefined,
+  contactName: '', contactPhone: '', contactEmail: '', address: '', creditCode: '', remark: '',
+})
+const editSupplierId = ref<number | string>('')
+const editFormRules = {
+  supplierName: [{ required: true, message: '供应商名称不能为空', trigger: 'blur' }],
+}
+
+const supplierTypeOptions = [
+  { label: '原材料', value: 1 },
+  { label: '辅材', value: 2 },
+  { label: '设备', value: 3 },
+  { label: '服务', value: 4 },
+  { label: '其他', value: 5 },
+]
+
+const openEditDialog = async (row: Supplier) => {
+  editSupplierId.value = row.id
+  try {
+    const data = await supplierApi.detail(row.id)
+    editForm.supplierName = data.supplierName || ''
+    editForm.supplierShortName = data.supplierShortName || ''
+    editForm.supplierType = data.supplierType ?? undefined
+    editForm.contactName = data.contactName || ''
+    editForm.contactPhone = data.contactPhone || ''
+    editForm.contactEmail = data.contactEmail || ''
+    editForm.address = data.address || ''
+    editForm.creditCode = data.creditCode || ''
+    editForm.remark = data.remark || ''
+    showEditDialog.value = true
+  } catch { ElMessage.error('获取供应商详情失败') }
+}
+
+const submitEdit = async () => {
+  try { await editFormRef.value?.validate() } catch { return }
+  try {
+    await supplierApi.update(editSupplierId.value, editForm)
+    ElMessage.success('供应商信息更新成功')
+    showEditDialog.value = false
+    loadData()
+  } catch { /* 拦截器处理 */ }
+}
 </script>
 
 <template>
@@ -196,14 +258,21 @@ onMounted(loadData)
         </template>
       </el-table-column>
       <el-table-column label="风险" width="110"><template #default="{ row }"><StatusTag :value="row.blacklisted ? 'blacklisted' : row.riskLevel" :kind="row.blacklisted ? 'risk' : 'risk'" /></template></el-table-column>
+      <el-table-column prop="accountCount" label="账号数" width="80" align="center">
+        <template #default="{ row }">
+          <el-tag :type="row.accountCount > 0 ? 'success' : 'info'" size="small" effect="plain">{{ row.accountCount }}</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="performanceScore" label="绩效分" width="90" />
-      <el-table-column label="操作" width="220" fixed="right">
+      <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="router.push(`/purchasing/suppliers/${row.id}`)">详情</el-button>
+          <el-button link type="warning" :icon="Edit" @click="openEditDialog(row)">编辑</el-button>
           <el-dropdown v-if="!row.blacklisted" trigger="click" style="margin-left:4px">
             <el-button link type="info">更多<el-icon><ArrowDown /></el-icon></el-button>
             <template #dropdown>
               <el-dropdown-menu>
+                <el-dropdown-item @click="openAccountDialog(row)">管理账号</el-dropdown-item>
                 <el-dropdown-item @click="openAddBlacklist(row)">加入黑名单</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -288,6 +357,53 @@ onMounted(loadData)
       </template>
     </el-dialog>
     <ExportDialog v-model="exportVisible" />
+
+    <!-- 编辑供应商弹窗 -->
+    <el-dialog v-model="showEditDialog" title="编辑供应商" width="620px" :close-on-click-modal="false">
+      <el-form ref="editFormRef" :model="editForm" :rules="editFormRules" label-width="110px">
+        <el-form-item label="供应商名称" prop="supplierName">
+          <el-input v-model="editForm.supplierName" placeholder="请输入企业全称" />
+        </el-form-item>
+        <el-form-item label="供应商简称">
+          <el-input v-model="editForm.supplierShortName" placeholder="选填" />
+        </el-form-item>
+        <el-form-item label="供应商类型">
+          <el-select v-model="editForm.supplierType" placeholder="请选择" clearable style="width:100%">
+            <el-option v-for="opt in supplierTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+          </el-select>
+        </el-form-item>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="联系人">
+              <el-input v-model="editForm.contactName" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="联系电话">
+              <el-input v-model="editForm.contactPhone" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="邮箱">
+          <el-input v-model="editForm.contactEmail" placeholder="选填" />
+        </el-form-item>
+        <el-form-item label="地址">
+          <el-input v-model="editForm.address" placeholder="选填" />
+        </el-form-item>
+        <el-form-item label="统一信用代码">
+          <el-input v-model="editForm.creditCode" placeholder="选填，须与营业执照一致" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="editForm.remark" type="textarea" :rows="2" placeholder="选填" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditDialog = false">取消</el-button>
+        <el-button type="primary" @click="submitEdit">保存修改</el-button>
+      </template>
+    </el-dialog>
+
+    <SupplierAccountDialog v-model:visible="accountDialogVisible" :supplier-id="accountSupplierId" :supplier-name="accountSupplierName" @changed="onAccountChanged" />
   </PageContainer>
 </template>
 

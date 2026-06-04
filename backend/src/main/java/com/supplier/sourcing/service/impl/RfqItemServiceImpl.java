@@ -2,6 +2,7 @@ package com.supplier.sourcing.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.supplier.common.annotation.AuditLog;
 import com.supplier.common.exception.BusinessException;
 import com.supplier.common.result.PageResult;
 import com.supplier.common.result.ResultCode;
@@ -46,6 +47,7 @@ public class RfqItemServiceImpl implements RfqItemService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "询价单", businessType = "rfq_item", action = "新增物料行", businessIdExpr = "#result")
     public Long create(RfqItemCreateDTO dto) {
         RfqItem entity = RfqItemConverter.toEntity(dto);
         rfqItemMapper.insert(entity);
@@ -54,6 +56,7 @@ public class RfqItemServiceImpl implements RfqItemService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "询价单", businessType = "rfq_item", action = "编辑物料行", businessIdExpr = "#id")
     public void update(Long id, RfqItemUpdateDTO dto) {
         RfqItem entity = rfqItemMapper.selectById(id);
         if (entity == null) {
@@ -65,6 +68,7 @@ public class RfqItemServiceImpl implements RfqItemService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "询价单", businessType = "rfq_item", action = "删除物料行", businessIdExpr = "#id")
     public void delete(Long id) {
         RfqItem entity = rfqItemMapper.selectById(id);
         if (entity == null) {

@@ -24,6 +24,10 @@ import com.supplier.order.entity.PurchaseOrder;
 import com.supplier.order.entity.PurchaseOrderDetail;
 import com.supplier.order.mapper.PurchaseOrderDetailMapper;
 import com.supplier.order.mapper.PurchaseOrderMapper;
+import com.supplier.quality.dto.QualityInspectionCreateDTO;
+import com.supplier.quality.entity.InspectionStandard;
+import com.supplier.quality.mapper.InspectionStandardMapper;
+import com.supplier.quality.service.QualityInspectionService;
 import com.supplier.security.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -47,6 +51,8 @@ public class DeliveryNoticeServiceImpl implements DeliveryNoticeService {
     private final BizStatusTrackService bizStatusTrackService;
     private final PurchaseOrderMapper purchaseOrderMapper;
     private final PurchaseOrderDetailMapper purchaseOrderDetailMapper;
+    private final QualityInspectionService qualityInspectionService;
+    private final InspectionStandardMapper inspectionStandardMapper;
 
     private static final int STATUS_CONFIRMED = 2;
     private static final int STATUS_PARTIAL_SHIPPED = 3;
@@ -74,15 +80,7 @@ public class DeliveryNoticeServiceImpl implements DeliveryNoticeService {
                 new LambdaQueryWrapper<DeliveryDetail>().eq(DeliveryDetail::getNoticeId, id));
         List<DeliveryDetailVO> detailVOs = new ArrayList<>();
         for (DeliveryDetail d : details) {
-            DeliveryDetailVO dvo = new DeliveryDetailVO();
-            dvo.setId(d.getId()); dvo.setNoticeId(d.getNoticeId()); dvo.setOrderDetailId(d.getOrderDetailId());
-            dvo.setMaterialCode(d.getMaterialCode()); dvo.setMaterialName(d.getMaterialName());
-            dvo.setMaterialSpec(d.getMaterialSpec()); dvo.setUnit(d.getUnit());
-            dvo.setPlanQty(d.getPlanQty()); dvo.setActualQty(d.getActualQty());
-            dvo.setReceivedQty(d.getReceivedQty()); dvo.setQualifiedQty(d.getQualifiedQty());
-            dvo.setBatchNo(d.getBatchNo()); dvo.setProductionDate(d.getProductionDate());
-            dvo.setExpiryDate(d.getExpiryDate()); dvo.setRemark(d.getRemark());
-            detailVOs.add(dvo);
+            detailVOs.add(toDetailVO(d));
         }
         vo.setDetails(detailVOs);
         return vo;
@@ -170,6 +168,17 @@ public class DeliveryNoticeServiceImpl implements DeliveryNoticeService {
                 detail.setBatchNo(item.getBatchNo() != null ? item.getBatchNo() : dto.getBatchNo());
                 detail.setProductionDate(item.getProductionDate() != null ? item.getProductionDate() : dto.getProductionDate());
                 detail.setExpiryDate(item.getExpiryDate() != null ? item.getExpiryDate() : dto.getExpiryDate());
+                detail.setCaseNo(item.getCaseNo());
+                detail.setQtyPerCase(item.getQtyPerCase());
+                detail.setBarcode(item.getBarcode());
+                // 计算箱数：如果有箱号则统计，或者根据每箱数量计算
+                if (item.getQtyPerCase() != null && item.getQtyPerCase() > 0) {
+                    detail.setBoxCount(item.getActualQty().divide(BigDecimal.valueOf(item.getQtyPerCase()), 0, java.math.RoundingMode.CEILING).intValue());
+                } else if (item.getCaseNo() != null && !item.getCaseNo().isEmpty()) {
+                    detail.setBoxCount(1);
+                } else {
+                    detail.setBoxCount(0);
+                }
                 detail.setRemark(item.getRemark());
                 deliveryDetailMapper.insert(detail);
 
@@ -230,6 +239,99 @@ public class DeliveryNoticeServiceImpl implements DeliveryNoticeService {
         bizStatusTrackService.writeTrack("delivery_notice", notice.getId(), beforeStatus, 3, "ASN到达确认");
     }
 
+    @Override
+    public List<DeliveryDetailVO> getLines(Long id) {
+        getWithScope(id);
+        List<DeliveryDetail> details = deliveryDetailMapper.selectList(
+                new LambdaQueryWrapper<DeliveryDetail>().eq(DeliveryDetail::getNoticeId, id));
+        return details.stream().map(this::toDetailVO).toList();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "ASN", businessType = "delivery_notice", action = "ASN确认入库", businessIdExpr = "#id")
+    public void warehousing(Long id) {
+        DeliveryNotice notice = getWithScope(id);
+        if (!Integer.valueOf(3).equals(notice.getDeliveryStatus())) {
+            throw BusinessException.of(ResultCode.STATUS_NOT_ALLOWED.getCode(), "只有已送达通知单可确认入库");
+        }
+        int beforeStatus = notice.getDeliveryStatus();
+        notice.setDeliveryStatus(4);
+        deliveryNoticeMapper.updateById(notice);
+        bizStatusTrackService.writeTrack("delivery_notice", notice.getId(), beforeStatus, 4, "ASN确认入库");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "ASN", businessType = "delivery_notice", action = "触发质检", businessIdExpr = "#id")
+    public void triggerQuality(Long id) {
+        DeliveryNotice notice = getWithScope(id);
+        // 已送达(3)或已收货(4)状态可触发质检
+        if (!Integer.valueOf(3).equals(notice.getDeliveryStatus()) && !Integer.valueOf(4).equals(notice.getDeliveryStatus())) {
+            throw BusinessException.of(ResultCode.STATUS_NOT_ALLOWED.getCode(), "只有已送达或已收货的通知单可触发质检");
+        }
+        // 获取ASN明细行，为每个物料创建质检单
+        List<DeliveryDetail> details = deliveryDetailMapper.selectList(
+                new LambdaQueryWrapper<DeliveryDetail>().eq(DeliveryDetail::getNoticeId, id));
+        if (CollectionUtils.isEmpty(details)) {
+            throw BusinessException.of(ResultCode.PARAM_ERROR.getCode(), "该通知单无明细行，无法触发质检");
+        }
+        for (DeliveryDetail detail : details) {
+            // 查找检验标准
+            InspectionStandard standard = inspectionStandardMapper.selectOne(
+                    new LambdaQueryWrapper<InspectionStandard>().eq(InspectionStandard::getMaterialCode, detail.getMaterialCode()));
+            int strategy = (standard != null && standard.getInspectionStrategy() != null)
+                    ? standard.getInspectionStrategy() : 1;
+            // 免检策略(0)则跳过
+            if (strategy == 0) {
+                continue;
+            }
+            QualityInspectionCreateDTO qiDto = new QualityInspectionCreateDTO();
+            qiDto.setDeliveryId(id);
+            qiDto.setMaterialCode(detail.getMaterialCode());
+            qiDto.setMaterialName(detail.getMaterialName());
+            qiDto.setInspectQty(detail.getActualQty() != null ? detail.getActualQty() : BigDecimal.ZERO);
+            qiDto.setInspectType(strategy);
+            qualityInspectionService.create(qiDto);
+        }
+        // 更新状态为质检中(6)
+        int beforeStatus = notice.getDeliveryStatus();
+        notice.setDeliveryStatus(6);
+        deliveryNoticeMapper.updateById(notice);
+        bizStatusTrackService.writeTrack("delivery_notice", notice.getId(), beforeStatus, 6, "触发质检");
+        domainEventPublisher.publish("supplier.delivery", "delivery.asn.quality.triggered",
+                DomainEvent.builder()
+                        .eventType("delivery.asn.quality.triggered")
+                        .data(Map.of("businessId", notice.getId(), "businessNo", notice.getNoticeNo(),
+                                "supplierId", notice.getSupplierId()))
+                        .build());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "ASN", businessType = "delivery_notice", action = "扫码收货确认", businessIdExpr = "#id")
+    public void scanReceive(Long id, DeliveryActionDTO dto) {
+        DeliveryNotice notice = getWithScope(id);
+        // 已送达(3)状态可扫码收货
+        if (!Integer.valueOf(3).equals(notice.getDeliveryStatus())) {
+            throw BusinessException.of(ResultCode.STATUS_NOT_ALLOWED.getCode(), "只有已送达的通知单可进行扫码收货");
+        }
+        int beforeStatus = notice.getDeliveryStatus();
+        // 更新为已收货(4)
+        notice.setDeliveryStatus(4);
+        if (dto != null && StringUtils.hasText(dto.getRemark())) {
+            notice.setRemark(dto.getRemark());
+        }
+        deliveryNoticeMapper.updateById(notice);
+        bizStatusTrackService.writeTrack("delivery_notice", notice.getId(), beforeStatus, 4, "扫码收货确认");
+        domainEventPublisher.publish("supplier.delivery", "delivery.asn.scan-received",
+                DomainEvent.builder()
+                        .eventType("delivery.asn.scan-received")
+                        .data(Map.of("businessId", notice.getId(), "businessNo", notice.getNoticeNo(),
+                                "supplierId", notice.getSupplierId()))
+                        .build());
+    }
+
     private DeliveryNotice getWithScope(Long id) {
         DeliveryNotice notice = deliveryNoticeMapper.selectById(id);
         if (notice == null) {
@@ -255,6 +357,20 @@ public class DeliveryNoticeServiceImpl implements DeliveryNoticeService {
     private DeliveryNoticeVO toVO(DeliveryNotice e) {
         DeliveryNoticeVO vo = new DeliveryNoticeVO();
         vo.setId(e.getId()); vo.setNoticeNo(e.getNoticeNo()); vo.setOrderId(e.getOrderId()); vo.setOrderNo(e.getOrderNo()); vo.setSupplierId(e.getSupplierId()); vo.setSupplierName(e.getSupplierName()); vo.setPlanDeliveryDate(e.getPlanDeliveryDate()); vo.setActualDeliveryDate(e.getActualDeliveryDate()); vo.setDeliveryStatus(e.getDeliveryStatus()); vo.setDeliveryMethod(e.getDeliveryMethod()); vo.setDeliveryCompany(e.getDeliveryCompany()); vo.setDeliveryNo(e.getDeliveryNo()); vo.setDeliveryAddress(e.getDeliveryAddress()); vo.setReceiver(e.getReceiver()); vo.setSendTime(e.getSendTime()); vo.setArriveTime(e.getArriveTime()); vo.setBatchNo(e.getBatchNo()); vo.setProductionDate(e.getProductionDate()); vo.setExpiryDate(e.getExpiryDate()); vo.setRemark(e.getRemark());
+        return vo;
+    }
+
+    private DeliveryDetailVO toDetailVO(DeliveryDetail d) {
+        DeliveryDetailVO vo = new DeliveryDetailVO();
+        vo.setId(d.getId()); vo.setNoticeId(d.getNoticeId()); vo.setOrderDetailId(d.getOrderDetailId());
+        vo.setMaterialCode(d.getMaterialCode()); vo.setMaterialName(d.getMaterialName());
+        vo.setMaterialSpec(d.getMaterialSpec()); vo.setUnit(d.getUnit());
+        vo.setPlanQty(d.getPlanQty()); vo.setActualQty(d.getActualQty());
+        vo.setReceivedQty(d.getReceivedQty()); vo.setQualifiedQty(d.getQualifiedQty());
+        vo.setBatchNo(d.getBatchNo()); vo.setProductionDate(d.getProductionDate());
+        vo.setExpiryDate(d.getExpiryDate()); vo.setBoxCount(d.getBoxCount());
+        vo.setCaseNo(d.getCaseNo()); vo.setQtyPerCase(d.getQtyPerCase());
+        vo.setBarcode(d.getBarcode()); vo.setRemark(d.getRemark());
         return vo;
     }
 }

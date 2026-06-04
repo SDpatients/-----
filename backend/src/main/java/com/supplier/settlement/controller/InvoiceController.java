@@ -8,6 +8,7 @@ import com.supplier.settlement.dto.InvoiceUploadDTO;
 import com.supplier.settlement.query.InvoiceQuery;
 import com.supplier.settlement.service.InvoiceService;
 import com.supplier.settlement.vo.InvoiceVO;
+import com.supplier.settlement.vo.PaymentVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -20,7 +21,13 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 @Validated
 @Tag(name = "发票管理")
@@ -86,5 +93,19 @@ public class InvoiceController {
                                     @RequestBody InvoiceActionDTO dto) {
         invoiceService.voidInvoice(id, dto);
         return Result.success();
+    }
+
+    @Operation(summary = "OCR发票识别")
+    @PostMapping("/ocr")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Map<String, Object>> ocrRecognize(@RequestParam("file") MultipartFile file) throws IOException {
+        return Result.success(invoiceService.ocrRecognize(file.getBytes(), file.getOriginalFilename()));
+    }
+
+    @Operation(summary = "查询发票关联的付款记录")
+    @GetMapping("/{id}/payments")
+    @PreAuthorize("isAuthenticated()")
+    public Result<List<PaymentVO>> linkedPayments(@PathVariable @NotNull(message = "发票ID不能为空") Long id) {
+        return Result.success(invoiceService.getLinkedPayments(id));
     }
 }

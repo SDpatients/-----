@@ -20,15 +20,15 @@ export const supplierUser: UserInfo = {
   avatarColor: '#0bb783',
 }
 
-export const permissions = ['dashboard:view', 'supplier:view', 'supplier:audit', 'order:view', 'order:confirm', 'asn:view', 'asn:create', 'quality:view', 'settlement:view', 'rfq:view', 'quote:view', 'inventory:view', 'integration:view', 'config:view', 'finance:view', 'message:view', 'file:upload', 'logistics:view']
+export const permissions = ['dashboard:view', 'supplier:view', 'supplier:audit', 'order:view', 'order:confirm', 'order:change', 'asn:view', 'asn:create', 'quality:view', 'settlement:view', 'rfq:view', 'quote:view', 'inventory:view', 'integration:view', 'config:view', 'finance:view', 'message:view', 'file:upload', 'logistics:view']
 
 export const supplierPermissions = ['supplier:dashboard:view', 'supplier:order:view', 'supplier:order:confirm', 'supplier:delivery:view', 'supplier:delivery:create', 'supplier:quality:view', 'supplier:quality:rectify', 'supplier:settlement:view', 'supplier:rfq:view', 'supplier:profile:view', 'message:view', 'file:upload']
 
 export const suppliers: Supplier[] = [
-  { id: 1, code: 'SUP-2026-001', name: '华东精密制造有限公司', category: '结构件', level: 'A', status: 1, contact: '周明', phone: '13800010001', admissionStage: '已准入', performanceScore: 96, riskLevel: 'low', address: '江苏省苏州市工业园区' },
-  { id: 2, code: 'SUP-2026-002', name: '星河电子科技股份有限公司', category: '电子件', level: 'B', status: 0, contact: '林夏', phone: '13800010002', admissionStage: '资质审核', performanceScore: 82, riskLevel: 'medium', address: '广东省深圳市南山区' },
-  { id: 3, code: 'SUP-2026-003', name: '北辰包装材料有限公司', category: '包装材料', level: 'C', status: 2, contact: '赵青', phone: '13800010003', admissionStage: '整改中', performanceScore: 68, riskLevel: 'high', address: '浙江省杭州市余杭区' },
-  { id: 4, code: 'SUP-2026-004', name: '远航物流装备有限公司', category: '物流装备', level: 'A', status: 1, contact: '陈一', phone: '13800010004', admissionStage: '已准入', performanceScore: 91, riskLevel: 'low', address: '上海市嘉定区' },
+  { id: 1, code: 'SUP-2026-001', name: '华东精密制造有限公司', category: '结构件', level: 'A', status: 1, contact: '周明', phone: '13800010001', admissionStage: '已准入', performanceScore: 96, riskLevel: 'low', accountCount: 3, address: '江苏省苏州市工业园区' },
+  { id: 2, code: 'SUP-2026-002', name: '星河电子科技股份有限公司', category: '电子件', level: 'B', status: 0, contact: '林夏', phone: '13800010002', admissionStage: '资质审核', performanceScore: 82, riskLevel: 'medium', accountCount: 2, address: '广东省深圳市南山区' },
+  { id: 3, code: 'SUP-2026-003', name: '北辰包装材料有限公司', category: '包装材料', level: 'C', status: 2, contact: '赵青', phone: '13800010003', admissionStage: '整改中', performanceScore: 68, riskLevel: 'high', accountCount: 1, address: '浙江省杭州市余杭区' },
+  { id: 4, code: 'SUP-2026-004', name: '远航物流装备有限公司', category: '物流装备', level: 'A', status: 1, contact: '陈一', phone: '13800010004', admissionStage: '已准入', performanceScore: 91, riskLevel: 'low', accountCount: 0, address: '上海市嘉定区' },
 ]
 
 export const orders: PurchaseOrder[] = [
@@ -73,9 +73,15 @@ export const portalTodos: PortalTodo[] = [
 ]
 
 export const attachments: AttachmentFile[] = [
-  { id: 1, fileName: '供应商准入资料.pdf', version: 'V3', size: '2.4MB', uploader: '周明', uploadedAt: '2026-05-18 10:12', category: '资质附件' },
-  { id: 2, fileName: 'PO-202605-0001确认回执.xlsx', version: 'V1', size: '860KB', uploader: '林夏', uploadedAt: '2026-05-19 15:30', category: '订单附件' },
-  { id: 3, fileName: '8D整改报告.docx', version: 'V2', size: '1.8MB', uploader: '周明', uploadedAt: '2026-05-20 11:04', category: '质量附件' },
+  { id: 1, fileName: '供应商准入资料.pdf', version: 'V3', size: '2.4MB', uploader: '周明', uploadedAt: '2026-05-18 10:12', category: '资质附件', businessType: 'supplier', businessId: 1 },
+  { id: 2, fileName: 'PO-202605-0001确认回执.xlsx', version: 'V1', size: '860KB', uploader: '林夏', uploadedAt: '2026-05-19 15:30', category: '订单附件', businessType: 'purchase_order', businessId: 1 },
+  { id: 3, fileName: '8D整改报告.docx', version: 'V2', size: '1.8MB', uploader: '周明', uploadedAt: '2026-05-20 11:04', category: '质量附件', businessType: 'quality_inspection', businessId: 1 },
+  // RFQ 询价单附件
+  { id: 101, fileName: 'RFQ技术规格说明书.pdf', version: 'V2', size: '3.2MB', uploader: '王采购', uploadedAt: '2026-05-21 09:15', category: 'RFQ附件', businessType: 'rfq', businessId: 2062062163412926466 },
+  { id: 102, fileName: 'RFQ图纸_v2.dwg', version: 'V1', size: '5.6MB', uploader: '王采购', uploadedAt: '2026-05-21 09:18', category: 'RFQ附件', businessType: 'rfq', businessId: 2062062163412926466 },
+  { id: 103, fileName: '物料BOM清单.xlsx', version: 'V3', size: '420KB', uploader: '王采购', uploadedAt: '2026-05-22 14:32', category: 'RFQ附件', businessType: 'rfq', businessId: 2062062163412926466 },
+  { id: 104, fileName: '质量检验标准.pdf', version: 'V1', size: '1.2MB', uploader: '李工', uploadedAt: '2026-05-22 16:05', category: 'RFQ附件', businessType: 'rfq', businessId: 2062062163412926466 },
+  { id: 105, fileName: '样品图片.zip', version: 'V1', size: '8.4MB', uploader: '林夏', uploadedAt: '2026-05-23 10:20', category: 'RFQ附件', businessType: 'rfq', businessId: 2062062163412926466 },
 ]
 
 export const importExportTasks: ImportExportTask[] = [
@@ -292,6 +298,13 @@ export const quoteRecords: QuoteRecord[] = [
   { id: 4, quoteNo: 'QT-202605-0004', rfqId: 3, rfqNo: 'RFQ-202605-0003', supplierName: '北辰包装材料有限公司', currency: 'USD', totalAmount: 8500, taxAmount: 0, quoteStatus: 3, validUntil: '2026-05-31', remark: '', submitTime: '2026-05-18 08:45' },
 ]
 
+/** 报价明细行 mock 数据 */
+export const quoteLineItems = [
+  { id: 1, quoteId: 1, rfqLineId: 1, materialCode: 'MAT-001', materialName: '精密铸件A型', spec: '300x200x50mm', unit: 'PCS', quantity: 500, unitPrice: 312, totalPrice: 156000, deliveryDate: '2026-06-15', paymentTerms: '30天账期' },
+  { id: 2, quoteId: 2, rfqLineId: 1, materialCode: 'MAT-001', materialName: '精密铸件A型', spec: '300x200x50mm', unit: 'PCS', quantity: 500, unitPrice: 324, totalPrice: 162000, deliveryDate: '2026-06-18', paymentTerms: '款到发货' },
+  { id: 3, quoteId: 3, rfqLineId: 1, materialCode: 'MAT-002', materialName: '不锈钢法兰', spec: 'DN50 PN16', unit: 'SET', quantity: 200, unitPrice: 190, totalPrice: 38000, deliveryDate: '2026-06-10', paymentTerms: '月结30天' },
+]
+
 /** 集成端点 mock 数据 */
 export const integrationEndpoints = [
   { id: 1, endpointCode: 'ERP_INV', endpointName: 'ERP库存同步', systemType: 'ERP', integrationMode: 'REST', baseUrl: 'http://erp.internal/api/v2/inventory', timeoutMs: 30000, retryLimit: 3, status: 1 },
@@ -332,3 +345,69 @@ export const materials = [
   { id: 9, materialCode: 'MAT-009', materialName: '包装纸箱A型', spec: '600x400x300mm', unit: 'PCS', category: '包装材料', status: 1, createTime: '2026-04-05 00:00:00' },
   { id: 10, materialCode: 'MAT-010', materialName: '润滑脂EP2', spec: 'EP2 15kg/桶', unit: 'KG', category: '辅料', status: 1, createTime: '2026-04-05 00:00:00' },
 ]
+
+export const supplierAccounts = [
+  { id: 101, username: 'zhouming', realName: '周明', phone: '13800010001', email: 'zhouming@huadong.com', userType: 2, supplierId: 1, status: 1, lastLoginTime: '2026-05-30 14:22:00', createTime: '2026-01-10 09:00:00', remark: '主账号' },
+  { id: 102, username: 'wangfang', realName: '王芳', phone: '13900020002', email: 'wangfang@huadong.com', userType: 2, supplierId: 1, status: 1, lastLoginTime: '2026-05-28 10:15:00', createTime: '2026-02-15 09:00:00', remark: '' },
+  { id: 103, username: 'liwei', realName: '李伟', phone: '13700030003', email: 'liwei@huadong.com', userType: 2, supplierId: 1, status: 0, lastLoginTime: '2026-04-01 08:00:00', createTime: '2026-03-20 09:00:00', remark: '已离职' },
+  { id: 201, username: 'linxia', realName: '林夏', phone: '13800010002', email: 'linxia@xinghe.com', userType: 2, supplierId: 2, status: 1, lastLoginTime: '2026-05-31 09:30:00', createTime: '2026-02-01 09:00:00', remark: '主账号' },
+  { id: 202, username: 'chenxu', realName: '陈旭', phone: '13600040004', email: 'chenxu@xinghe.com', userType: 2, supplierId: 2, status: 1, lastLoginTime: '2026-05-29 16:45:00', createTime: '2026-03-10 09:00:00', remark: '' },
+  { id: 301, username: 'zhaoqing', realName: '赵青', phone: '13800010003', email: 'zhaoqing@beichen.com', userType: 2, supplierId: 3, status: 1, lastLoginTime: '2026-05-25 11:00:00', createTime: '2026-04-05 09:00:00', remark: '主账号' },
+]
+
+export const sysDicts = [
+  { id: 1, dictName: '订单状态', dictCode: 'order_status', description: '采购订单状态', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 2, dictName: '供应商类型', dictCode: 'supplier_type', description: '供应商分类', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 3, dictName: '供应商状态', dictCode: 'supplier_status', description: '供应商状态', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 4, dictName: '付款方式', dictCode: 'payment_method', description: '付款方式', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 5, dictName: '送货状态', dictCode: 'delivery_status', description: '送货状态', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 6, dictName: '检验结果', dictCode: 'inspect_result', description: '检验结果', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 7, dictName: '对账状态', dictCode: 'recon_status', description: '对账状态', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 8, dictName: '发票状态', dictCode: 'invoice_status', description: '发票状态', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 9, dictName: '付款状态', dictCode: 'payment_status', description: '付款状态', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 10, dictName: '发票类型', dictCode: 'invoice_type', description: '发票类型', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 11, dictName: '检验类型', dictCode: 'inspect_type', description: '检验类型', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 12, dictName: '变更类型', dictCode: 'change_type', description: '变更类型', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 13, dictName: '处理方式', dictCode: 'handle_method', description: '处理方式', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 14, dictName: '用户类型', dictCode: 'user_type', description: '用户类型', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 15, dictName: '审批状态', dictCode: 'approve_status', description: '审批状态', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 16, dictName: '供应商评级', dictCode: 'supplier_rating', description: '供应商评级', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 17, dictName: '资质类型', dictCode: 'qual_type', description: '供应商资质类型', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 18, dictName: '币种', dictCode: 'currency', description: '货币类型', status: 1, createTime: '2026-01-01 00:00:00' },
+  { id: 19, dictName: '物料分类', dictCode: 'material_category', description: '物料主数据分类', status: 1, createTime: '2026-01-01 00:00:00' },
+]
+
+export const dictItems: Record<string, { id: number; dictId: number; itemLabel: string; itemValue: string; sort: number; description: string; status: number }[]> = {
+  material_category: [
+    { id: 1, dictId: 19, itemLabel: '结构件', itemValue: '结构件', sort: 1, description: '', status: 1 },
+    { id: 2, dictId: 19, itemLabel: '液压件', itemValue: '液压件', sort: 2, description: '', status: 1 },
+    { id: 3, dictId: 19, itemLabel: '电子件', itemValue: '电子件', sort: 3, description: '', status: 1 },
+    { id: 4, dictId: 19, itemLabel: '传动件', itemValue: '传动件', sort: 4, description: '', status: 1 },
+    { id: 5, dictId: 19, itemLabel: '包装材料', itemValue: '包装材料', sort: 5, description: '', status: 1 },
+    { id: 6, dictId: 19, itemLabel: '辅料', itemValue: '辅料', sort: 6, description: '', status: 1 },
+    { id: 7, dictId: 19, itemLabel: '紧固件', itemValue: '紧固件', sort: 7, description: '', status: 1 },
+    { id: 8, dictId: 19, itemLabel: '密封件', itemValue: '密封件', sort: 8, description: '', status: 1 },
+  ],
+  order_status: [
+    { id: 101, dictId: 1, itemLabel: '待确认', itemValue: 'pending', sort: 1, description: '', status: 1 },
+    { id: 102, dictId: 1, itemLabel: '已确认', itemValue: 'confirmed', sort: 2, description: '', status: 1 },
+    { id: 103, dictId: 1, itemLabel: '已发货', itemValue: 'shipped', sort: 3, description: '', status: 1 },
+    { id: 104, dictId: 1, itemLabel: '已完成', itemValue: 'completed', sort: 4, description: '', status: 1 },
+    { id: 105, dictId: 1, itemLabel: '已取消', itemValue: 'cancelled', sort: 5, description: '', status: 1 },
+  ],
+  supplier_type: [
+    { id: 201, dictId: 2, itemLabel: '生产型', itemValue: 'production', sort: 1, description: '', status: 1 },
+    { id: 202, dictId: 2, itemLabel: '贸易型', itemValue: 'trade', sort: 2, description: '', status: 1 },
+  ],
+  supplier_status: [
+    { id: 301, dictId: 3, itemLabel: '待审核', itemValue: 'pending', sort: 1, description: '', status: 1 },
+    { id: 302, dictId: 3, itemLabel: '已通过', itemValue: 'approved', sort: 2, description: '', status: 1 },
+    { id: 303, dictId: 3, itemLabel: '已拒绝', itemValue: 'rejected', sort: 3, description: '', status: 1 },
+    { id: 304, dictId: 3, itemLabel: '已冻结', itemValue: 'frozen', sort: 4, description: '', status: 1 },
+  ],
+  currency: [
+    { id: 401, dictId: 18, itemLabel: '人民币', itemValue: 'CNY', sort: 1, description: '', status: 1 },
+    { id: 402, dictId: 18, itemLabel: '美元', itemValue: 'USD', sort: 2, description: '', status: 1 },
+    { id: 403, dictId: 18, itemLabel: '欧元', itemValue: 'EUR', sort: 3, description: '', status: 1 },
+  ],
+}

@@ -9,6 +9,7 @@ import com.supplier.common.result.ResultCode;
 import com.supplier.sourcing.converter.SupplierConverter;
 import com.supplier.sourcing.dto.SupplierCreateDTO;
 import com.supplier.sourcing.dto.SupplierRegisterDTO;
+import com.supplier.sourcing.dto.SupplierUpdateDTO;
 import com.supplier.sourcing.entity.SupplierBlacklist;
 import com.supplier.sourcing.entity.SupplierInfo;
 import com.supplier.sourcing.enums.SupplierBlacklistStatusEnum;
@@ -18,6 +19,8 @@ import com.supplier.sourcing.mapper.SupplierInfoMapper;
 import com.supplier.sourcing.query.SupplierQuery;
 import com.supplier.sourcing.service.SupplierService;
 import com.supplier.sourcing.vo.SupplierVO;
+import com.supplier.system.entity.SysUser;
+import com.supplier.system.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +36,7 @@ public class SupplierServiceImpl implements SupplierService {
 
     private final SupplierInfoMapper supplierInfoMapper;
     private final SupplierBlacklistMapper supplierBlacklistMapper;
+    private final SysUserMapper sysUserMapper;
 
     @Override
     public PageResult<SupplierVO> page(SupplierQuery query) {
@@ -58,6 +62,7 @@ public class SupplierServiceImpl implements SupplierService {
                 .map(SupplierConverter::toVO)
                 .collect(Collectors.toList());
 
+        enrichAccountCount(voList);
         enrichBlacklistInfo(voList);
 
         return PageResult.of(voList, page.getTotal(), page.getSize(), page.getCurrent());
@@ -88,6 +93,25 @@ public class SupplierServiceImpl implements SupplierService {
             } else {
                 vo.setBlacklisted(false);
             }
+        }
+    }
+
+    private void enrichAccountCount(List<SupplierVO> voList) {
+        if (voList.isEmpty()) return;
+
+        List<Long> supplierIds = voList.stream()
+                .map(SupplierVO::getId)
+                .collect(Collectors.toList());
+
+        List<SysUser> users = sysUserMapper.selectList(
+                new LambdaQueryWrapper<SysUser>()
+                        .in(SysUser::getSupplierId, supplierIds));
+
+        Map<Long, Long> countMap = users.stream()
+                .collect(Collectors.groupingBy(SysUser::getSupplierId, Collectors.counting()));
+
+        for (SupplierVO vo : voList) {
+            vo.setAccountCount(countMap.getOrDefault(vo.getId(), 0L));
         }
     }
 
@@ -150,6 +174,18 @@ public class SupplierServiceImpl implements SupplierService {
         supplierInfoMapper.updateById(supplier);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void update(Long id, SupplierUpdateDTO dto) {
+        SupplierInfo entity = getSupplierOrThrow(id);
+        if (StringUtils.hasText(dto.getCreditCode())
+                && !dto.getCreditCode().equals(entity.getCreditCode())) {
+            checkDuplicateCreditCodeExcludeSelf(dto.getCreditCode(), id);
+        }
+        SupplierConverter.updateEntity(dto, entity);
+        supplierInfoMapper.updateById(entity);
+    }
+
     // ==================== 内部私有方法 ====================
 
     private void checkDuplicateCode(String supplierCode) {
@@ -164,6 +200,17 @@ public class SupplierServiceImpl implements SupplierService {
         if (StringUtils.hasText(creditCode)) {
             Long count = supplierInfoMapper.selectCount(new LambdaQueryWrapper<SupplierInfo>()
                     .eq(SupplierInfo::getCreditCode, creditCode));
+            if (count > 0) {
+                throw BusinessException.of(ResultCode.DUPLICATE_SUBMIT.getCode(), "统一社会信用代码已存在");
+            }
+        }
+    }
+
+    private void checkDuplicateCreditCodeExcludeSelf(String creditCode, Long excludeId) {
+        if (StringUtils.hasText(creditCode)) {
+            Long count = supplierInfoMapper.selectCount(new LambdaQueryWrapper<SupplierInfo>()
+                    .eq(SupplierInfo::getCreditCode, creditCode)
+                    .ne(SupplierInfo::getId, excludeId));
             if (count > 0) {
                 throw BusinessException.of(ResultCode.DUPLICATE_SUBMIT.getCode(), "统一社会信用代码已存在");
             }

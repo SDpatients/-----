@@ -6,15 +6,19 @@ import com.supplier.common.exception.BusinessException;
 import com.supplier.common.result.PageResult;
 import com.supplier.common.result.ResultCode;
 import com.supplier.security.util.SecurityUtils;
+import com.supplier.settlement.converter.InvoiceConverter;
 import com.supplier.settlement.converter.PaymentConverter;
 import com.supplier.settlement.dto.PaymentActionDTO;
 import com.supplier.settlement.dto.PaymentCreateDTO;
 import com.supplier.settlement.dto.PaymentScheduleDTO;
+import com.supplier.settlement.entity.Invoice;
 import com.supplier.settlement.entity.Payment;
 import com.supplier.settlement.enums.PaymentStatusEnum;
+import com.supplier.settlement.mapper.InvoiceMapper;
 import com.supplier.settlement.mapper.PaymentMapper;
 import com.supplier.settlement.query.PaymentQuery;
 import com.supplier.settlement.service.PaymentService;
+import com.supplier.settlement.vo.InvoiceVO;
 import com.supplier.settlement.vo.PaymentVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,12 +26,17 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentMapper paymentMapper;
+    private final InvoiceMapper invoiceMapper;
 
     @Override
     public PageResult<PaymentVO> page(PaymentQuery query) {
@@ -135,6 +144,35 @@ public class PaymentServiceImpl implements PaymentService {
         entity.setPaymentStatus(PaymentStatusEnum.CANCELLED.getCode());
         entity.setRemark(StringUtils.hasText(dto.getRemark()) ? dto.getRemark() : entity.getRemark());
         paymentMapper.updateById(entity);
+    }
+
+    @Override
+    public List<Map<String, Object>> getCallbackLogs(Long id) {
+        getWithDataScope(id);
+        // 回传日志 - 返回基础结构
+        List<Map<String, Object>> logs = new ArrayList<>();
+        Map<String, Object> log = new LinkedHashMap<>();
+        log.put("id", id);
+        log.put("paymentId", id);
+        log.put("callbackType", "ERP");
+        log.put("callbackStatus", "pending");
+        log.put("callbackTime", LocalDateTime.now().toString());
+        log.put("remark", "待回传");
+        logs.add(log);
+        return logs;
+    }
+
+    @Override
+    public List<InvoiceVO> getLinkedInvoices(Long id) {
+        Payment payment = getWithDataScope(id);
+        List<InvoiceVO> vos = new ArrayList<>();
+        if (payment.getInvoiceId() != null) {
+            Invoice invoice = invoiceMapper.selectById(payment.getInvoiceId());
+            if (invoice != null) {
+                vos.add(InvoiceConverter.toVO(invoice));
+            }
+        }
+        return vos;
     }
 
     private Payment getWithDataScope(Long id) {

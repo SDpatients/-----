@@ -76,28 +76,28 @@ export const mockApi = {
       return [] // 后端不可用时返回空数组
     }
   },
-  getOrderDetails: async (orderId: number) => {
+  getOrderDetails: async (orderId: number | string) => {
     try {
       return await orderDetailApi.list(orderId)
     } catch {
       return [] // 后端不可用时返回空数组
     }
   },
-  getDeliveryDetails: async (deliveryId: number) => {
+  getDeliveryDetails: async (deliveryId: number | string) => {
     try {
       return await logisticsApi.deliveryLines(deliveryId)
     } catch {
       return []
     }
   },
-  getInspectionDetails: async (inspectionId: number) => {
+  getInspectionDetails: async (inspectionId: number | string) => {
     try {
       return await qualityApi.lines(inspectionId)
     } catch {
       return []
     }
   },
-  getReconDetails: async (reconId: number) => {
+  getReconDetails: async (reconId: number | string) => {
     try {
       return await settlementApi.lines(reconId)
     } catch {

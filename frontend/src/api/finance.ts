@@ -89,3 +89,33 @@ export const performanceApi = {
 
   delete: (id: number | string) => request.delete(`/v1/supplier-performances/${id}`),
 }
+
+export interface PaymentApprovalActionDTO {
+  approvalStatus: number
+  approveRemark?: string
+}
+
+export const paymentApprovalApi = {
+  page: async (params: PageQuery) =>
+    asPage<any>(await request.get<ApiPage<any>, ApiPage<any>>('/v1/payment-approvals', { params }), params.pageNum, params.pageSize),
+
+  detail: (id: number | string) => request.get(`/v1/payment-approvals/${id}`),
+
+  submit: (paymentId: number | string) => request.post<void, void>('/v1/payment-approvals/submit', { paymentId }),
+
+  approve: (id: number | string, data: PaymentApprovalActionDTO) => request.post<void, void>(`/v1/payment-approvals/${id}/approve`, data),
+
+  reject: (id: number | string, data: PaymentApprovalActionDTO) => request.post<void, void>(`/v1/payment-approvals/${id}/reject`, data),
+}
+
+export const reconciliationDetailApi = {
+  list: (reconId: number | string) => request.get<any[], any[]>(`/v1/reconciliation-details`, { params: { reconId } }),
+
+  detail: (id: number | string) => request.get(`/v1/reconciliation-details/${id}`),
+
+  create: (data: Record<string, unknown>) => request.post<number, number>('/v1/reconciliation-details', data),
+
+  update: (id: number | string, data: Record<string, unknown>) => request.put<void, void>(`/v1/reconciliation-details/${id}`, data),
+
+  delete: (id: number | string) => request.delete<void, void>(`/v1/reconciliation-details/${id}`),
+}

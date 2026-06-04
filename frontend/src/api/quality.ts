@@ -20,7 +20,7 @@ export const inspectionStandardApi = {
   page: async (params: PageQuery) => asPage<InspectionStandard>(await request.get<ApiPage<InspectionStandard>, ApiPage<InspectionStandard>>('/v1/inspection-standards', { params }), params.pageNum, params.pageSize),
   detail: (id: number | string) => request.get<InspectionStandard, InspectionStandard>(`/v1/inspection-standards/${id}`),
   create: (data: Partial<InspectionStandard>) => request.post<number, number>('/v1/inspection-standards', data),
-  update: (id: number | string, data: Partial<InspectionStandard>) => request.put<void, void>(`/v1/inspection-standards/${id}`, data),
+  update: (data: Partial<InspectionStandard> & { id: number | string }) => request.put<void, void>('/v1/inspection-standards', data),
   delete: (id: number | string) => request.delete<void, void>(`/v1/inspection-standards/${id}`),
-  toggleStatus: (id: number | string) => request.post<void, void>(`/v1/inspection-standards/${id}/toggle`),
+  toggleStatus: (id: number | string, status: number) => request.post<void, void>(`/v1/inspection-standards/${id}/status`, null, { params: { status } }),
 }

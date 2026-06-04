@@ -15,10 +15,12 @@ import com.supplier.sourcing.query.SupplierQualificationQuery;
 import com.supplier.sourcing.service.SupplierQualificationService;
 import com.supplier.sourcing.vo.SupplierQualificationVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SupplierQualificationServiceImpl implements SupplierQualificationService {
@@ -86,6 +88,7 @@ public class SupplierQualificationServiceImpl implements SupplierQualificationSe
             throw BusinessException.of(ResultCode.DATA_FORBIDDEN.getCode(), "供应商用户未绑定供应商");
         }
         if (querySupplierId != null && !supplierId.equals(querySupplierId)) {
+            log.warn("数据越权: 登录用户supplierId={}, 请求参数supplierId={}", supplierId, querySupplierId);
             throw BusinessException.of(ResultCode.DATA_FORBIDDEN);
         }
         return supplierId;

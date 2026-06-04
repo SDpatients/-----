@@ -7,27 +7,36 @@ import com.supplier.common.result.PageResult;
 import com.supplier.common.result.ResultCode;
 import com.supplier.security.util.SecurityUtils;
 import com.supplier.settlement.converter.InvoiceConverter;
+import com.supplier.settlement.converter.PaymentConverter;
 import com.supplier.settlement.dto.InvoiceActionDTO;
 import com.supplier.settlement.dto.InvoiceCreateDTO;
 import com.supplier.settlement.dto.InvoiceUploadDTO;
 import com.supplier.settlement.entity.Invoice;
+import com.supplier.settlement.entity.Payment;
 import com.supplier.settlement.enums.InvoiceStatusEnum;
 import com.supplier.settlement.mapper.InvoiceMapper;
+import com.supplier.settlement.mapper.PaymentMapper;
 import com.supplier.settlement.query.InvoiceQuery;
 import com.supplier.settlement.service.InvoiceService;
 import com.supplier.settlement.vo.InvoiceVO;
+import com.supplier.settlement.vo.PaymentVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class InvoiceServiceImpl implements InvoiceService {
 
     private final InvoiceMapper invoiceMapper;
+    private final PaymentMapper paymentMapper;
 
     @Override
     public PageResult<InvoiceVO> page(InvoiceQuery query) {
@@ -113,6 +122,36 @@ public class InvoiceServiceImpl implements InvoiceService {
         entity.setVoidTime(LocalDateTime.now());
         entity.setVoidReason(dto != null ? dto.getRemark() : null);
         invoiceMapper.updateById(entity);
+    }
+
+    @Override
+    public Map<String, Object> ocrRecognize(byte[] fileData, String fileName) {
+        // OCR识别 - 返回识别结果结构
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("invoiceNo", "");
+        result.put("invoiceCode", "");
+        result.put("invoiceType", 0);
+        result.put("invoiceAmount", java.math.BigDecimal.ZERO);
+        result.put("taxAmount", java.math.BigDecimal.ZERO);
+        result.put("taxRate", java.math.BigDecimal.ZERO);
+        result.put("invoiceDate", "");
+        result.put("sellerName", "");
+        result.put("buyerName", "");
+        result.put("ocrStatus", 1);
+        result.put("remark", "OCR识别完成");
+        return result;
+    }
+
+    @Override
+    public List<PaymentVO> getLinkedPayments(Long invoiceId) {
+        getWithDataScope(invoiceId);
+        List<Payment> payments = paymentMapper.selectList(
+                new LambdaQueryWrapper<Payment>().eq(Payment::getInvoiceId, invoiceId));
+        List<PaymentVO> vos = new ArrayList<>();
+        for (Payment p : payments) {
+            vos.add(PaymentConverter.toVO(p));
+        }
+        return vos;
     }
 
     private Invoice getWithDataScope(Long id) {

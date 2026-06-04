@@ -42,10 +42,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token) && jwtUtil.validateToken(token)) {
             // 检查 Redis 黑名单
             String jti = jwtUtil.getJtiFromToken(token);
-            if (jti != null && Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_PREFIX + jti))) {
-                log.warn("JWT令牌已失效(黑名单): jti={}", jti);
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "令牌已失效，请重新登录");
-                return;
+            if (jti != null) {
+                try {
+                    if (Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_PREFIX + jti))) {
+                        log.warn("JWT令牌已失效(黑名单): jti={}", jti);
+                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "令牌已失效，请重新登录");
+                        return;
+                    }
+                } catch (Exception e) {
+                    log.warn("Redis不可用，跳过黑名单检查: {}", e.getMessage());
+                }
             }
 
             String username = jwtUtil.getUsernameFromToken(token);

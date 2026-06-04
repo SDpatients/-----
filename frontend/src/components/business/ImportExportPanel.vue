@@ -6,6 +6,12 @@ import ImportDialog from './ImportDialog.vue'
 import ExportDialog from './ExportDialog.vue'
 import ImportExportTaskList from './ImportExportTaskList.vue'
 
+const props = withDefaults(defineProps<{
+  module?: string
+}>(), {
+  module: '',
+})
+
 const importVisible = ref(false)
 const exportVisible = ref(false)
 

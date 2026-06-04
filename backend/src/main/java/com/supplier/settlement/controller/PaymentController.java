@@ -7,6 +7,7 @@ import com.supplier.settlement.dto.PaymentCreateDTO;
 import com.supplier.settlement.dto.PaymentScheduleDTO;
 import com.supplier.settlement.query.PaymentQuery;
 import com.supplier.settlement.service.PaymentService;
+import com.supplier.settlement.vo.InvoiceVO;
 import com.supplier.settlement.vo.PaymentVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +22,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.Map;
 
 @Validated
 @Tag(name = "付款管理")
@@ -94,5 +98,19 @@ public class PaymentController {
                                @RequestBody PaymentActionDTO dto) {
         paymentService.cancel(id, dto);
         return Result.success();
+    }
+
+    @Operation(summary = "获取付款回传状态日志")
+    @GetMapping("/{id}/callback-logs")
+    @PreAuthorize("isAuthenticated()")
+    public Result<List<Map<String, Object>>> callbackLogs(@PathVariable @NotNull(message = "付款单ID不能为空") Long id) {
+        return Result.success(paymentService.getCallbackLogs(id));
+    }
+
+    @Operation(summary = "获取付款关联的发票记录")
+    @GetMapping("/{id}/invoices")
+    @PreAuthorize("isAuthenticated()")
+    public Result<List<InvoiceVO>> linkedInvoices(@PathVariable @NotNull(message = "付款单ID不能为空") Long id) {
+        return Result.success(paymentService.getLinkedInvoices(id));
     }
 }

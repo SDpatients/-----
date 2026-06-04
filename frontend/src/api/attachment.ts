@@ -16,15 +16,19 @@ export const attachmentApi = {
   preview: async (id: number) => downloadBlob({ url: `/v1/file-attachments/${id}/preview`, method: 'GET' }, `attachment-${id}`),
   download: async (id: number) => downloadBlob({ url: `/v1/file-attachments/${id}/download`, method: 'GET' }, `attachment-${id}`),
   remove: (id: number) => request.delete<void, void>(`/v1/file-attachments/${id}`),
-  versions: async (id: number): Promise<AttachmentVersion[]> => {
-    const files = await attachmentApi.list({ businessType: '', businessId: id })
+  rename: (id: number, fileName: string) => request.put<void, void>(`/v1/file-attachments/${id}/rename`, { fileName }),
+  versions: async (query: { businessType?: string; businessId: string | number }): Promise<AttachmentVersion[]> => {
+    const files = await attachmentApi.list({ businessType: query.businessType || '', businessId: query.businessId })
     return files.map((item) => ({ id: item.id, fileName: item.fileName, version: item.version, uploader: item.uploader, uploadedAt: item.uploadedAt, remark: `${item.category}版本记录` }))
   },
-  uploadBinary: async (file: File, businessType: string, businessId?: number, businessNo?: string) => {
+  uploadBinary: async (file: File, businessType: string, businessId?: number | string, businessNo?: string) => {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('businessType', businessType)
-    if (businessId !== undefined && businessId !== null) formData.append('businessId', String(businessId))
+    // 注意：19 位雪花 ID 不能走 JS Number，必须按原字符串透传，否则会丢精度
+    if (businessId !== undefined && businessId !== null && businessId !== '') {
+      formData.append('businessId', typeof businessId === 'string' ? businessId : String(businessId))
+    }
     if (businessNo) formData.append('businessNo', businessNo)
     return request.post<number, number>('/v1/file-attachments/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
   },

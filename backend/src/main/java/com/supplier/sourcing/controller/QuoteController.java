@@ -4,6 +4,7 @@ import com.supplier.common.result.PageResult;
 import com.supplier.common.result.Result;
 import com.supplier.sourcing.dto.BargainDTO;
 import com.supplier.sourcing.dto.QuoteCreateDTO;
+import com.supplier.sourcing.dto.QuoteUpdateDTO;
 import com.supplier.sourcing.query.QuoteQuery;
 import com.supplier.sourcing.service.QuoteCompareService;
 import com.supplier.sourcing.service.QuoteItemService;
@@ -12,6 +13,7 @@ import com.supplier.sourcing.vo.QuoteCompareVO;
 import com.supplier.sourcing.vo.QuoteItemVO;
 import com.supplier.sourcing.vo.QuoteNegotiationVO;
 import com.supplier.sourcing.vo.QuoteVO;
+import com.supplier.sourcing.vo.RfqSummaryVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -47,6 +50,13 @@ public class QuoteController {
         return Result.success(quoteService.page(query));
     }
 
+    @Operation(summary = "查询有报价的询价单列表（用于报价对比页左侧）")
+    @GetMapping("/rfqs")
+    @PreAuthorize("isAuthenticated()")
+    public Result<List<RfqSummaryVO>> listRfqWithQuotes() {
+        return Result.success(quoteService.listRfqWithQuotes());
+    }
+
     @Operation(summary = "查询报价单详情")
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
@@ -66,6 +76,15 @@ public class QuoteController {
     @PreAuthorize("isAuthenticated()")
     public Result<Long> create(@Valid @RequestBody QuoteCreateDTO dto) {
         return Result.success(quoteService.create(dto));
+    }
+
+    @Operation(summary = "更新报价单")
+    @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Void> update(@PathVariable @NotNull(message = "报价单ID不能为空") Long id,
+                               @RequestBody QuoteUpdateDTO dto) {
+        quoteService.update(id, dto);
+        return Result.success();
     }
 
     @Operation(summary = "提交报价")

@@ -108,7 +108,6 @@ const service = axios.create({
 
           return JSON.parse(result)
         } catch {
-          console.debug('[API] transformResponse 解析失败，使用原始数据')
           try {
             return JSON.parse(data)
           } catch {
@@ -152,7 +151,6 @@ service.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (config.data && typeof config.data === 'object' && !(config.data instanceof FormData) && !config.headers?.['Content-Type']) {
     config.headers['Content-Type'] = 'application/json'
   }
-  console.debug(`[API] → ${config.method?.toUpperCase()} ${config.url}`, config.params || config.data)
   return config
 })
 
@@ -162,15 +160,12 @@ const redirectLogin = () => {
 }
 
 const handleApiError = (error: ApiError) => {
-  console.debug(`[API] ✗ 错误处理 code=${error.code} status=${error.status} message="${error.message}"`)
   if ([401, 40101, 40102].includes(error.code) || error.status === 401) {
-    console.debug('[API] !! 401 未授权 → 跳转登录页')
     ElMessage.error(error.code === 40102 ? '登录令牌已过期，请重新登录' : '登录已失效，请重新登录')
     redirectLogin()
     return
   }
   if ([403, 40301, 40302].includes(error.code) || error.status === 403) {
-    console.debug('[API] !! 403 无权限')
     ElMessage.error(error.code === 40302 ? '无权访问该数据' : error.message || '无权限访问')
     return
   }
@@ -202,10 +197,11 @@ const handleApiError = (error: ApiError) => {
     ElMessage.error('外部系统异常，请稍后重试')
     return
   }
-  const isMockEnabled = import.meta.env.VITE_USE_MOCK === 'true'
-  if (isMockEnabled && error.code === 502) {
-    console.debug('[API] !! 502 HTML 响应（Mock 未拦截或后端不可达）')
+  if (error.code === 50003) {
+    ElMessage.error('缓存服务未启动，请联系管理员检查Redis服务')
+    return
   }
+  const isMockEnabled = import.meta.env.VITE_USE_MOCK === 'true'
   const trace = error.traceId ? `，追踪号：${error.traceId}` : ''
   ElMessage.error(`${error.message || '请求失败'}${trace}`)
 }
@@ -215,16 +211,13 @@ service.interceptors.response.use(
     const result = response.data as ApiResult<unknown>
     if (result && typeof result.code === 'number') {
       if (result.code === 200) {
-        console.debug(`[API] ← ${response.config.method?.toUpperCase()} ${response.config.url} ✓ 200`)
         return result.data
       }
-      console.debug(`[API] ← ${response.config.method?.toUpperCase()} ${response.config.url} ✗ code=${result.code} "${result.message}"`)
       const error = new ApiError(result.message, result.code, result.traceId, response.status)
       handleApiError(error)
       return Promise.reject(error)
     }
     if (typeof response.data === 'string' && response.data.trim().toLowerCase().startsWith('<!doctype html')) {
-      console.debug(`[API] ← ${response.config.method?.toUpperCase()} ${response.config.url} ✗ HTML（后端不可达或代理错误）`)
       const error = new ApiError('接口返回了前端页面 HTML，请检查 Vite 代理或后端服务地址', 502, undefined, response.status)
       handleApiError(error)
       return Promise.reject(error)
@@ -234,7 +227,6 @@ service.interceptors.response.use(
   (error: AxiosError<ApiResult<unknown>>) => {
     const data = error.response?.data
     const apiError = new ApiError(data?.message || error.message || '网络异常', data?.code || error.response?.status || 500, data?.traceId, error.response?.status)
-    console.debug(`[API] ← ${error.config?.method?.toUpperCase()} ${error.config?.url} ✗ 网络/HTTP异常 status=${error.response?.status}`, error.message)
     handleApiError(apiError)
     return Promise.reject(apiError)
   },

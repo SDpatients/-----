@@ -70,14 +70,14 @@ const deductionTypeMap: Record<number, string> = { 1: '质量', 2: '延期', 3: 
 // ---- 创建扣款弹窗（仅采购方） ----
 const showCreate = ref(false)
 const createForm = reactive({
-  deductionNo: '', supplierId: null as number | null, sourceType: 'QUALITY', sourceId: null as number | null,
-  deductionType: 1, deductionAmount: 0, deductionReason: '', reconId: null as number | null,
+  deductionNo: '', supplierId: null as string | null, sourceType: 'NCR', sourceId: null as string | null,
+  deductionType: 1, deductionAmount: 0, deductionReason: '', reconId: null as string | null,
 })
 
 const openCreate = () => {
   createForm.deductionNo = `DK${Date.now()}`
   createForm.supplierId = null
-  createForm.sourceType = 'QUALITY'
+  createForm.sourceType = 'NCR'
   createForm.sourceId = null
   createForm.deductionType = 1
   createForm.deductionAmount = 0
@@ -208,8 +208,8 @@ const handleBook = async (row: any) => {
         </el-form-item>
         <el-form-item label="来源类型" required>
           <el-select v-model="createForm.sourceType" style="width:100%">
-            <el-option label="质量" value="QUALITY" />
-            <el-option label="延期" value="DELIVERY" />
+            <el-option label="NCR" value="NCR" />
+            <el-option label="延期" value="DELAY" />
             <el-option label="短交" value="SHORTAGE" />
             <el-option label="其他" value="OTHER" />
           </el-select>

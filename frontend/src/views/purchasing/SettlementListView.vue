@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'elem
 import { settlementApi } from '@/api/settlement'
 import { supplierApi } from '@/api/supplier'
 import { toSettlement, toSupplier } from '@/api/adapters'
+import { toId } from '@/utils/id'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import ExportDialog from '@/components/business/ExportDialog.vue'
@@ -55,7 +56,7 @@ const handleConfirm = async (row: Settlement) => {
       ElMessage.warning('该对账单存在差异明细，请在详情页中确认差异后再提交')
       return
     }
-    await settlementApi.confirm(row.id, { confirmedAmount: row.amount, diffAmount: 0 })
+    await settlementApi.confirm(row.id, { confirmedAmount: row.amount, diffAmount: 0, disputed: false, confirmRemark: '确认无误' })
     ElMessage.success('对账单已确认')
     loadData()
   } catch { /* 拦截器处理 */ }
@@ -145,7 +146,7 @@ const confirmSupplierSelection = () => {
     ElMessage.warning('请选择一个供应商')
     return
   }
-  createForm.supplierId = Number(tempSelectedSupplier.value.id)
+  createForm.supplierId = toId(tempSelectedSupplier.value.id)
   createForm.supplierName = tempSelectedSupplier.value.name
   if (!createForm.reconNo) generateReconNo()
   supplierDialogVisible.value = false
@@ -159,7 +160,7 @@ const formRules: FormRules = {
 }
 const showCreateDialog = ref(false)
 const createForm = reactive({
-  reconNo: '', supplierId: null as number | null, supplierName: '', reconPeriod: dayjs().format('YYYY-MM'),
+  reconNo: '', supplierId: null as string | null, supplierName: '', reconPeriod: dayjs().format('YYYY-MM'),
   startDate: '', endDate: '', totalAmount: 0, remark: '',
 })
 
@@ -207,12 +208,11 @@ onMounted(loadData)
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.reconStatus" placeholder="全部" clearable style="width: 160px" @change="loadData">
-            <el-option label="待对账" :value="0" />
-            <el-option label="对账中" :value="1" />
+            <el-option label="草稿" :value="0" />
+            <el-option label="已发送" :value="1" />
             <el-option label="已确认" :value="2" />
-            <el-option label="有异议" :value="3" />
-            <el-option label="已完成" :value="4" />
-            <el-option label="已冻结" :value="5" />
+            <el-option label="有争议" :value="3" />
+            <el-option label="已关闭" :value="4" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -233,9 +233,9 @@ onMounted(loadData)
       <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="router.push(`/purchasing/settlements/${row.id}`)">详情</el-button>
-          <el-button v-if="row.reconStatus !== 5 && row.reconStatus !== 6" link type="success" @click="handleSend(row)">发送</el-button>
-          <el-button v-if="row.reconStatus !== 5 && row.reconStatus !== 6" link type="warning" @click="handleConfirm(row)">确认</el-button>
-          <el-button v-if="row.reconStatus !== 5 && row.reconStatus !== 6" link type="danger" @click="handleFreeze(row)">冻结</el-button>
+          <el-button v-if="row.reconStatus !== 4" link type="success" @click="handleSend(row)">发送</el-button>
+          <el-button v-if="row.reconStatus !== 4" link type="warning" @click="handleConfirm(row)">确认</el-button>
+          <el-button v-if="row.reconStatus !== 4" link type="danger" @click="handleFreeze(row)">冻结</el-button>
           <el-button v-if="row.reconStatus === 5" link type="primary" @click="handleUnfreeze(row)">解冻</el-button>
         </template>
       </el-table-column>
@@ -325,7 +325,7 @@ onMounted(loadData)
       >
         <el-table-column width="55" align="center">
           <template #default="{ row }">
-            <el-radio :model-value="isSupplierSelected(row)" @click.stop />
+            <el-radio :model-value="isSupplierSelected(row)" :label="true" @click.stop />
           </template>
         </el-table-column>
         <el-table-column prop="code" label="供应商编码" width="140" />

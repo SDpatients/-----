@@ -13,7 +13,7 @@ import type { QuoteRecord, RfqRecord, RfqLineItem, QuoteLineItem, BargainRecord 
 
 const route = useRoute()
 const router = useRouter()
-const id = computed(() => Number(route.params.id))
+const id = computed(() => route.params.id as string)
 
 const loading = ref(false)
 const detail = ref<RfqRecord | null>(null)
@@ -77,7 +77,7 @@ const statusLabel = computed(() => {
 })
 
 const canPublish = computed(() => detail.value?.rfqStatus === 0)
-const canClose = computed(() => detail.value?.rfqStatus === 1 || detail.value?.rfqStatus === 2)
+const canClose = computed(() => detail.value?.rfqStatus === 2)
 const canCancel = computed(() => detail.value?.rfqStatus === 1 || detail.value?.rfqStatus === 2)
 
 const handlePublish = async () => {
@@ -273,6 +273,7 @@ onMounted(() => {
           <el-descriptions-item label="报价截止时间">{{ detail.quoteDeadline }}</el-descriptions-item>
           <el-descriptions-item label="状态">{{ statusLabel }}</el-descriptions-item>
           <el-descriptions-item label="发布时间">{{ detail.publishTime || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="备注" :span="3">{{ detail.remark || '-' }}</el-descriptions-item>
         </el-descriptions>
 
         <!-- 操作按钮 -->
@@ -347,9 +348,9 @@ onMounted(() => {
           </el-tab-pane>
 
           <el-tab-pane label="附件">
-            <AttachmentUpload />
+            <AttachmentUpload business-type="rfq" :business-id="id" />
             <el-divider>附件版本</el-divider>
-            <AttachmentVersionList />
+            <AttachmentVersionList business-type="rfq" :business-id="id" />
             <el-divider>附件列表</el-divider>
             <AttachmentPanel business-type="rfq" :business-id="id" />
           </el-tab-pane>
@@ -419,13 +420,34 @@ onMounted(() => {
               placement="top"
             >
               <div class="timeline-header">
-                <el-tag size="small" :type="item.fromUserType === 'buyer' ? '' : 'success'">
+                <el-tag size="small" :type="item.fromUserType === 'buyer' ? 'primary' : 'success'">
                   {{ item.fromUserType === 'buyer' ? '采购方' : '供应商' }}
                 </el-tag>
                 <span class="timeline-user">{{ item.fromUserName }}</span>
                 <span class="timeline-action">{{ item.action === 'request_reprice' ? '发起还价' : item.action === 'resubmit' ? '重新报价' : item.action === 'accept' ? '接受' : '拒绝' }}</span>
               </div>
-              <div class="timeline-msg">{{ item.message }}</div>
+              <!-- 还价详情：显示目标价/供应商报价 -->
+              <div v-if="item.fromUserType === 'buyer' && item.action === 'request_reprice'" class="timeline-price-detail">
+                <div v-if="item.targetPrice != null" class="price-item">
+                  <span class="price-label">采购方目标价：</span>
+                  <span class="price-value price-target">{{ Number(item.targetPrice).toLocaleString() }}</span>
+                </div>
+                <div v-if="item.message" class="price-item">
+                  <span class="price-label">还价说明：</span>
+                  <span>{{ item.message }}</span>
+                </div>
+              </div>
+              <div v-else-if="item.fromUserType === 'supplier' && item.action === 'resubmit'" class="timeline-price-detail">
+                <div v-if="item.supplierPrice != null" class="price-item">
+                  <span class="price-label">供应商报价：</span>
+                  <span class="price-value price-supplier">{{ Number(item.supplierPrice).toLocaleString() }}</span>
+                </div>
+                <div v-if="item.message" class="price-item">
+                  <span class="price-label">报价说明：</span>
+                  <span>{{ item.message }}</span>
+                </div>
+              </div>
+              <div v-else class="timeline-msg">{{ item.message }}</div>
             </el-timeline-item>
           </el-timeline>
           <el-empty v-else description="暂无议价记录" :image-size="40" />
@@ -527,5 +549,34 @@ onMounted(() => {
 .timeline-msg {
   color: #606266;
   margin-top: 4px;
+}
+.timeline-price-detail {
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  border-left: 3px solid #409eff;
+}
+.timeline-price-detail .price-item {
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: #303133;
+}
+.timeline-price-detail .price-item:last-child {
+  margin-bottom: 0;
+}
+.timeline-price-detail .price-label {
+  color: #909399;
+  margin-right: 4px;
+}
+.timeline-price-detail .price-value {
+  font-weight: 600;
+  font-size: 14px;
+}
+.timeline-price-detail .price-target {
+  color: #e6a23c;
+}
+.timeline-price-detail .price-supplier {
+  color: #67c23a;
 }
 </style>

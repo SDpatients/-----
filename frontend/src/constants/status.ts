@@ -26,6 +26,7 @@ export const statusMap: Record<string, { label: string; type: TagType }> = {
   '送货3': { label: '已送达', type: 'success' },
   '送货4': { label: '已收货', type: 'success' },
   '送货5': { label: '已拒收', type: 'danger' },
+  '送货6': { label: '质检中', type: 'warning' },
   // 质检结果
   '质检0': { label: '待检验', type: 'warning' },
   '质检1': { label: '合格', type: 'success' },

@@ -39,6 +39,15 @@ export const materialApi = {
   detail: (id: number | string) =>
     request.get<BackendMaterial, BackendMaterial>(`/v1/materials/${id}`).then(toMaterial),
 
+  create: (data: { materialCode: string; materialName: string; spec?: string; unit?: string; category?: string; remark?: string }) =>
+    request.post<number, number>('/v1/materials', data),
+
+  update: (id: number | string, data: { materialCode: string; materialName: string; spec?: string; unit?: string; category?: string; remark?: string }) =>
+    request.put<void, void>(`/v1/materials/${id}`, data),
+
+  delete: (id: number | string) =>
+    request.delete<void, void>(`/v1/materials/${id}`),
+
   /** 按关键词搜索物料（适合 Select 远程搜索） */
   search: (keyword: string, pageSize = 20) =>
     materialApi.page({ pageNum: 1, pageSize, keyword }),

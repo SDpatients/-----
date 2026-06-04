@@ -23,6 +23,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
 
 @Validated
 @RestController
@@ -30,6 +32,12 @@ import java.nio.charset.StandardCharsets;
 @RequiredArgsConstructor
 public class ImportTaskController {
     private final ImportTaskService service;
+
+    @GetMapping("/templates")
+    @PreAuthorize("isAuthenticated()")
+    public Result<List<Map<String, Object>>> templates() {
+        return Result.success(service.listTemplates());
+    }
 
     @GetMapping("/{importType}/template")
     @PreAuthorize("isAuthenticated()")

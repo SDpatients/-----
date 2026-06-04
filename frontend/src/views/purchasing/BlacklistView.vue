@@ -90,7 +90,7 @@ const submitCreate = async () => {
   }
   try {
     await blacklistApi.create({
-      supplierId: Number(createForm.supplierId) || 0,
+      supplierId: createForm.supplierId || 0,
       supplierName: createForm.supplierName,
       creditCode: createForm.creditCode || undefined,
       reason: createForm.reason,

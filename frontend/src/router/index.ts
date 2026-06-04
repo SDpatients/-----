@@ -6,6 +6,7 @@ import LoginView from '@/views/LoginView.vue'
 import MessageCenterView from '@/views/MessageCenterView.vue'
 import DashboardView from '@/views/purchasing/DashboardView.vue'
 import SupplierListView from '@/views/purchasing/SupplierListView.vue'
+import MaterialListView from '@/views/purchasing/MaterialListView.vue'
 import OrderListView from '@/views/purchasing/OrderListView.vue'
 import OrderChangeListView from '@/views/purchasing/OrderChangeListView.vue'
 import OrderSyncStatusView from '@/views/purchasing/OrderSyncStatusView.vue'
@@ -27,16 +28,19 @@ import IntegrationConfigView from '@/views/purchasing/IntegrationConfigView.vue'
 import ExchangeRateView from '@/views/purchasing/ExchangeRateView.vue'
 import BusinessDetailView from '@/views/purchasing/BusinessDetailView.vue'
 import SystemConfigView from '@/views/purchasing/SystemConfigView.vue'
+import DictManageView from '@/views/purchasing/DictManageView.vue'
 import SupplierDashboardView from '@/views/supplier/SupplierDashboardView.vue'
 import SupplierOrderCenterView from '@/views/supplier/SupplierOrderCenterView.vue'
 import SupplierDeliveryCenterView from '@/views/supplier/SupplierDeliveryCenterView.vue'
 import SupplierDeliveryCreateView from '@/views/supplier/SupplierDeliveryCreateView.vue'
+import SupplierDeliveryDetailView from '@/views/supplier/SupplierDeliveryDetailView.vue'
 import SupplierQualityCenterView from '@/views/supplier/SupplierQualityCenterView.vue'
 import SupplierSettlementCenterView from '@/views/supplier/SupplierSettlementCenterView.vue'
 import SupplierRfqQuoteView from '@/views/supplier/SupplierRfqQuoteView.vue'
 import SupplierProfileView from '@/views/supplier/SupplierProfileView.vue'
 import SupplierRegisterView from '@/views/supplier/SupplierRegisterView.vue'
 import BlacklistView from '@/views/purchasing/BlacklistView.vue'
+import FaqView from '@/views/purchasing/FaqView.vue'
 import ForbiddenView from '@/views/error/ForbiddenView.vue'
 import NotFoundView from '@/views/error/NotFoundView.vue'
 
@@ -99,7 +103,10 @@ const routes: RouteRecordRaw[] = [
       { path: 'integration', component: IntegrationConfigView, meta: { title: '集成网关', permission: 'integration:view' } },
       { path: 'exchange-rates', component: ExchangeRateView, meta: { title: '汇率配置', permission: 'config:view' } },
       { path: 'settings', component: SystemConfigView, meta: { title: '系统配置', permission: 'config:view' } },
+      { path: 'dict', component: DictManageView, meta: { title: '字典管理', permission: 'config:view' } },
+      { path: 'materials', component: MaterialListView, meta: { title: '物料管理', permission: 'supplier:view' } },
       { path: 'blacklist', component: BlacklistView, meta: { title: '黑名单管理', activeMenu: '/purchasing/suppliers', permission: 'supplier:view' } },
+      { path: 'faq', component: FaqView, meta: { title: '常见问题', permission: 'dashboard:view' } },
     ],
   },
   {
@@ -112,6 +119,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'orders', component: SupplierOrderCenterView, meta: { title: '订单中心', permission: 'supplier:order:view' } },
       { path: 'deliveries', component: SupplierDeliveryCenterView, meta: { title: '发货中心', permission: 'supplier:delivery:view' } },
       { path: 'deliveries/create', component: SupplierDeliveryCreateView, meta: { title: '创建发货通知', activeMenu: '/supplier/deliveries', permission: 'supplier:delivery:create' } },
+      { path: 'deliveries/:id', component: SupplierDeliveryDetailView, meta: { title: '发货详情', moduleName: '发货详情', activeMenu: '/supplier/deliveries', permission: 'supplier:delivery:view' } },
       { path: 'quality', component: SupplierQualityCenterView, meta: { title: '质量中心', permission: 'supplier:quality:view' } },
       { path: 'settlements', component: SupplierSettlementCenterView, meta: { title: '财务中心', permission: 'supplier:settlement:view' } },
       { path: 'rfq', component: SupplierRfqQuoteView, meta: { title: 'RFQ报价', permission: 'supplier:rfq:view' } },
@@ -137,30 +145,24 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const userStore = useUserStore()
-  console.debug(`[Router] → ${to.fullPath}`, { public: to.meta.public, permission: to.meta.permission, userType: to.matched.find((item) => item.meta.userType)?.meta.userType })
   if (to.meta.public) {
-    console.debug('[Router] ✓ 公开路由，放行')
     return true
   }
   if (!userStore.token) {
-    console.debug(`[Router] !! 无 token → 重定向 /login?redirect=${to.fullPath}`)
     return `/login?redirect=${to.fullPath}`
   }
   if (!userStore.tokenExpiresAt) {
     userStore.restoreTokenExpiry()
   }
   if (userStore.tokenExpiresAt && Date.now() > userStore.tokenExpiresAt) {
-    console.debug('[Router] !! token 已过期 → 重定向 /login')
     userStore.logout()
     return `/login?redirect=${to.fullPath}`
   }
   if (!userStore.user) {
-    console.debug('[Router] … 加载用户信息')
     await userStore.loadCurrentUser()
   }
   const routeUserType = to.matched.find((item) => item.meta.userType)?.meta.userType
   if (routeUserType && userStore.user?.userType !== routeUserType) {
-    console.debug(`[Router] !! 用户类型不匹配 (需要=${routeUserType}, 实际=${userStore.user?.userType}) → /403`)
     return '/403'
   }
   // 细粒度权限检查：验证用户是否拥有路由所需的 permission
@@ -168,13 +170,10 @@ router.beforeEach(async (to) => {
   if (requiredPermission) {
     if (userStore.permissions.length === 0) {
       // 权限数据为空（后端尚未配置或权限码尚未对齐），降级为仅依赖 userType 隔离
-      console.warn(`[Router] ⚠ 权限列表为空，路由 ${to.fullPath} 需要 ${requiredPermission} 但无法校验，降级放行（仅 userType 隔离生效）`)
     } else if (!userStore.permissions.includes(requiredPermission)) {
-      console.debug(`[Router] !! 缺少权限 ${requiredPermission} → /403`)
       return '/403'
     }
   }
-  console.debug(`[Router] ✓ 放行 → ${to.fullPath}`)
   document.title = `${to.meta.title || '供应商协同'} - 供应商协同系统`
   return true
 })

@@ -6,7 +6,9 @@ import com.supplier.settlement.dto.ReconciliationConfirmDTO;
 import com.supplier.settlement.dto.ReconciliationCreateDTO;
 import com.supplier.settlement.query.ReconciliationQuery;
 import com.supplier.settlement.service.ReconciliationService;
+import com.supplier.settlement.vo.ReconciliationDetailVO;
 import com.supplier.settlement.vo.ReconciliationVO;
+import com.supplier.settlement.vo.ThreeWayMatchVO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.Map;
 
 @Validated
 @RestController
@@ -38,6 +43,12 @@ public class ReconciliationController {
         return Result.success(reconciliationService.getDetail(id));
     }
 
+    @GetMapping("/{id}/lines")
+    @PreAuthorize("isAuthenticated()")
+    public Result<List<ReconciliationDetailVO>> lines(@PathVariable @NotNull(message = "对账单ID不能为空") Long id) {
+        return Result.success(reconciliationService.getLines(id));
+    }
+
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public Result<Long> create(@Valid @RequestBody ReconciliationCreateDTO dto) {
@@ -56,5 +67,33 @@ public class ReconciliationController {
     public Result<Void> confirm(@PathVariable @NotNull(message = "对账单ID不能为空") Long id, @RequestBody ReconciliationConfirmDTO dto) {
         reconciliationService.confirm(id, dto);
         return Result.success();
+    }
+
+    @PostMapping("/{id}/freeze")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Void> freeze(@PathVariable @NotNull(message = "对账单ID不能为空") Long id,
+                               @RequestBody(required = false) Map<String, Object> data) {
+        reconciliationService.freeze(id, data);
+        return Result.success();
+    }
+
+    @PostMapping("/{id}/unfreeze")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Void> unfreeze(@PathVariable @NotNull(message = "对账单ID不能为空") Long id,
+                                 @RequestBody(required = false) Map<String, Object> data) {
+        reconciliationService.unfreeze(id, data);
+        return Result.success();
+    }
+
+    @GetMapping("/{id}/three-way-match")
+    @PreAuthorize("isAuthenticated()")
+    public Result<List<ThreeWayMatchVO>> threeWayMatch(@PathVariable @NotNull(message = "对账单ID不能为空") Long id) {
+        return Result.success(reconciliationService.getThreeWayMatch(id));
+    }
+
+    @GetMapping("/{reconId}/invoicable-amount")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Map<String, Object>> invoicableAmount(@PathVariable @NotNull(message = "对账单ID不能为空") Long reconId) {
+        return Result.success(reconciliationService.getInvoicableAmount(reconId));
     }
 }

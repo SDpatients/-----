@@ -54,7 +54,7 @@ const loadPerformances = async () => {
 const showPerfDialog = ref(false)
 const perfEditing = ref<any>(null)
 const perfForm = reactive({
-  supplierId: null as number | null, evaluatePeriod: '', qualityScore: 0, deliveryScore: 0,
+  supplierId: null as string | null, evaluatePeriod: '', qualityScore: 0, deliveryScore: 0,
   serviceScore: 0, priceScore: 0,
 })
 

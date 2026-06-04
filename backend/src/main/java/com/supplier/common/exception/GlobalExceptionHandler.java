@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -150,6 +151,17 @@ public class GlobalExceptionHandler {
     public Result<Void> handleAuthenticationException(AuthenticationException e) {
         log.warn("认证失败: {}", e.getMessage());
         return Result.error(HttpStatus.UNAUTHORIZED.value(), "认证失败: " + e.getMessage());
+    }
+
+    @ExceptionHandler(DataAccessException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public Result<Void> handleDataAccessException(DataAccessException e, HttpServletRequest request) {
+        log.error("数据访问异常: {} - {}", request.getRequestURI(), e.getMessage());
+        String message = e.getMessage();
+        if (message != null && (message.contains("Redis") || message.contains("redis") || message.contains("Unable to connect"))) {
+            return Result.error(ResultCode.REDIS_ERROR.getCode(), "缓存服务连接失败，请检查Redis服务是否启动");
+        }
+        return Result.error(ResultCode.INTERNAL_ERROR.getCode(), "数据访问异常，请联系管理员");
     }
 
     @ExceptionHandler(Exception.class)

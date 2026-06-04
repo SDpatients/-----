@@ -2,6 +2,7 @@ package com.supplier.system.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.supplier.system.entity.SysDictItem;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -18,4 +19,7 @@ public interface SysDictItemMapper extends BaseMapper<SysDictItem> {
             ORDER BY di.sort ASC, di.id ASC
             """)
     List<SysDictItem> selectByDictCode(@Param("dictCode") String dictCode);
+
+    @Delete("DELETE FROM sys_dict_item WHERE id = #{id}")
+    int hardDeleteById(@Param("id") Long id);
 }

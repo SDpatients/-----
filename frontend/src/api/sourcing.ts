@@ -1,6 +1,6 @@
 import { request, type ApiPage } from '@/utils/request'
 import { asPage } from '@/utils/apiNormalize'
-import type { PageQuery, RfqRecord, QuoteRecord, RfqLineItem, QuoteLineItem, BargainRecord, ExchangeRate } from '@/types/business'
+import type { PageQuery, RfqRecord, QuoteRecord, RfqLineItem, QuoteLineItem, BargainRecord, ExchangeRate, RfqSummaryRecord } from '@/types/business'
 
 /** 供应商端使用 */
 export const sourcingApi = {
@@ -23,7 +23,7 @@ export const sourcingApi = {
   quoteLines: (quoteId: number | string) => request.get<QuoteLineItem[], QuoteLineItem[]>(`/v1/quotes/${quoteId}/lines`),
 
   /** 创建报价（含明细行） */
-  quoteCreate: (data: Record<string, unknown>) => request.post<number, number>('/v1/quotes', data),
+  quoteCreate: (data: Record<string, unknown>) => request.post<number | string, number | string>('/v1/quotes', data),
 
   /** 提交报价 */
   quoteSubmit: (id: number | string) => request.post<void, void>(`/v1/quotes/${id}/submit`),
@@ -42,7 +42,7 @@ export const rfqApi = {
 
   detail: (id: number | string) => request.get<RfqRecord, RfqRecord>(`/v1/rfqs/${id}`),
 
-  create: (data: Record<string, unknown>) => request.post<number, number>('/v1/rfqs', data),
+  create: (data: Record<string, unknown>) => request.post<number | string, number | string>('/v1/rfqs', data),
 
   update: (id: number | string, data: Record<string, unknown>) => request.put<void, void>(`/v1/rfqs/${id}`, data),
 
@@ -83,7 +83,11 @@ export const quoteApi = {
 
   /** 定价转订单 */
   convertToOrder: (quoteId: number | string, data: { type: 'order' | 'agreement'; remark?: string }) =>
-    request.post<number, number>(`/v1/quotes/${quoteId}/convert`, data),
+    request.post<number | string, number | string>(`/v1/quotes/${quoteId}/convert`, data),
+
+  /** 查询有报价的询价单列表（用于报价对比页左侧） */
+  listRfqWithQuotes: () =>
+    request.get<RfqSummaryRecord[], RfqSummaryRecord[]>('/v1/quotes/rfqs'),
 }
 
 /** 议价管理 */
@@ -105,7 +109,7 @@ export const exchangeRateApi = {
   page: async (params: PageQuery) =>
     asPage<ExchangeRate>(await request.get<ApiPage<ExchangeRate>, ApiPage<ExchangeRate>>('/v1/exchange-rates', { params }), params.pageNum, params.pageSize),
 
-  create: (data: Partial<ExchangeRate>) => request.post<number, number>('/v1/exchange-rates', data),
+  create: (data: Partial<ExchangeRate>) => request.post<number | string, number | string>('/v1/exchange-rates', data),
 
   update: (id: number | string, data: Partial<ExchangeRate>) => request.put<void, void>(`/v1/exchange-rates/${id}`, data),
 

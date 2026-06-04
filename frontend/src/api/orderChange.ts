@@ -4,7 +4,7 @@ import { asPage } from '@/utils/apiNormalize'
 export interface OrderChangeQuery {
   pageNum: number
   pageSize: number
-  orderId?: number | null
+  orderId?: number | string | null
 }
 
 export interface OrderChangeItem {
@@ -23,7 +23,7 @@ export interface OrderChangeItem {
 }
 
 export interface OrderChangeCreateDTO {
-  orderId: number
+  orderId: number | string
   orderDetailId?: number
   changeType: number
   changeContent: string

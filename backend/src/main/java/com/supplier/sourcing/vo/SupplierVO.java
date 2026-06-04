@@ -1,5 +1,7 @@
 package com.supplier.sourcing.vo;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -9,10 +11,12 @@ import java.time.LocalDateTime;
 @Data
 public class SupplierVO {
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
     private String supplierCode;
     private String supplierName;
     private String supplierShortName;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long categoryId;
     private Integer supplierType;
     private String creditCode;
@@ -33,10 +37,13 @@ public class SupplierVO {
     private Integer rating;
     private Integer status;
     private LocalDateTime auditTime;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long auditBy;
     private String auditRemark;
     private String remark;
     private LocalDateTime createTime;
+
+    private Long accountCount;
 
     private Boolean blacklisted;
     private String blacklistReason;

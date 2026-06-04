@@ -6,13 +6,13 @@ export interface PurchaseOrderQuery {
   pageSize: number
   keyword?: string
   orderStatus?: number
-  supplierId?: number
+  supplierId?: number | string
   startDate?: string
   endDate?: string
 }
 
 export interface DeliveryFeedbackLineDTO {
-  orderDetailId: number
+  orderDetailId: number | string
   promisedDeliveryDate: string
   plannedQuantity: number
   batchNo?: string

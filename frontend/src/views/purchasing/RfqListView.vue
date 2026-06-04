@@ -290,7 +290,6 @@ const confirmMaterialSelection = () => {
     spec: m.spec || '',
     unit: m.unit || 'PCS',
     quantity: 1,
-    deliveryDate: '',
     remark: '',
   }))
   materialLines.value.push(...newLines)
@@ -340,7 +339,7 @@ const canOperate = (row: RfqRecord) => {
   const s = row.rfqStatus
   return {
     canPublish: s === 0,
-    canClose: s === 1 || s === 2,
+    canClose: s === 2,
     canCancel: s === 1 || s === 2,
   }
 }
@@ -494,14 +493,9 @@ onMounted(loadData)
                 <el-input-number v-model="row.quantity" :min="1" size="small" style="width: 100%" controls-position="right" />
               </template>
             </el-table-column>
-            <el-table-column label="交货日期" width="150">
+            <el-table-column label="交期" width="160">
               <template #default="{ row }">
-                <el-date-picker v-model="row.deliveryDate" type="date" size="small" placeholder="日期" style="width: 100%" value-format="YYYY-MM-DD" />
-              </template>
-            </el-table-column>
-            <el-table-column label="备注" width="120">
-              <template #default="{ row }">
-                <el-input v-model="row.remark" size="small" placeholder="备注" />
+                <el-date-picker v-model="row.deliveryDate" type="date" size="small" style="width: 100%" value-format="YYYY-MM-DD" placeholder="选择交期" />
               </template>
             </el-table-column>
             <el-table-column label="操作" width="60" fixed="right" align="center">

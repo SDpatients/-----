@@ -59,7 +59,6 @@ export function useWebSocket(options?: {
     ws.onopen = () => {
       connected.value = true
       reconnectAttempt.value = 0
-      console.debug('[WS] 连接已建立')
     }
 
     ws.onmessage = (event: MessageEvent) => {
@@ -80,7 +79,6 @@ export function useWebSocket(options?: {
 
     ws.onclose = (event) => {
       connected.value = false
-      console.debug(`[WS] 连接关闭 (code=${event.code})`)
 
       // 非正常关闭时尝试重连
       if (event.code !== 1000 && event.code !== 1001) {
@@ -98,7 +96,6 @@ export function useWebSocket(options?: {
     if (reconnectTimer) return
     const delay = Math.min(1000 * Math.pow(2, reconnectAttempt.value), maxReconnectDelay)
     reconnectAttempt.value++
-    console.debug(`[WS] ${delay}ms 后尝试重连 (第 ${reconnectAttempt.value} 次)`)
 
     reconnectTimer = window.setTimeout(() => {
       reconnectTimer = undefined

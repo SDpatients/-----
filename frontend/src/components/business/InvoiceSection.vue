@@ -52,8 +52,8 @@ defineExpose({ load })
 // ---- 创建发票弹窗 ----
 const showCreate = ref(false)
 const createForm = reactive({
-  invoiceNo: '', supplierId: null as number | null, supplierName: '',
-  invoiceAmount: 0, taxAmount: 0, invoiceDate: '', reconId: null as number | null,
+  invoiceNo: '', supplierId: null as string | null, supplierName: '',
+  invoiceAmount: 0, taxAmount: 0, taxRate: 13, invoiceDate: '', reconId: null as string | null,
 })
 // 6.2.4 可开票金额信息
 const invoicableInfo = ref<{ invoicableAmount: number; totalAmount: number; invoicedAmount: number } | null>(null)
@@ -65,6 +65,7 @@ const openCreate = () => {
   createForm.supplierName = ''
   createForm.invoiceAmount = 0
   createForm.taxAmount = 0
+  createForm.taxRate = 13
   createForm.invoiceDate = ''
   createForm.reconId = null
   invoicableInfo.value = null
@@ -328,8 +329,11 @@ const openVerifyDetail = (row: any) => {
         <el-form-item label="发票金额" prop="invoiceAmount">
           <el-input-number v-model="createForm.invoiceAmount" :min="0" :precision="2" style="width:100%" />
         </el-form-item>
-        <el-form-item label="税额" prop="taxRate">
+        <el-form-item label="税额" prop="taxAmount">
           <el-input-number v-model="createForm.taxAmount" :min="0" :precision="2" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="税率(%)" prop="taxRate">
+          <el-input-number v-model="createForm.taxRate" :min="0" :max="100" :precision="2" style="width:100%" />
         </el-form-item>
         <el-form-item label="开票日期" prop="invoiceDate">
           <el-date-picker v-model="createForm.invoiceDate" type="date" value-format="YYYY-MM-DD" style="width:100%" />

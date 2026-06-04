@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { supplierApi } from '@/api/supplier'
@@ -10,12 +10,11 @@ import { logisticsApi } from '@/api/logistics'
 import { qualityApi } from '@/api/quality'
 import { settlementApi } from '@/api/settlement'
 import { notificationApi } from '@/api/notification'
-import { mockApi } from '@/api/mockApi'
+import { qualificationApi } from '@/api/qualification'
 import { toSupplier, toOrder, toAsn, toQuality, toSettlement, toPortalTodo } from '@/api/adapters'
 import type { OrderDetailLine, DeliveryDetailLine, InspectionDetailLine, ReconDetailLine, ThreeWayMatchData, ThreeWayMatchItem } from '@/api/mockData'
 import type { Certificate } from '@/types/business'
 import PageContainer from '@/components/common/PageContainer.vue'
-import StatusTag from '@/components/business/StatusTag.vue'
 import AttachmentPanel from '@/components/business/AttachmentPanel.vue'
 import AttachmentUpload from '@/components/business/AttachmentUpload.vue'
 import AttachmentVersionList from '@/components/business/AttachmentVersionList.vue'
@@ -35,9 +34,9 @@ const id = computed(() => route.params.id as string)
 // 字段名 -> 中文标签映射
 const fieldLabelMap: Record<string, string> = {
   // 供应商
-  code: '供应商编码', name: '供应商名称', category: '品类', level: '等级',
-  status: '状态', contact: '联系人', phone: '联系电话', address: '地址',
-  admissionStage: '准入阶段', performanceScore: '绩效分', riskLevel: '风险等级',
+  code: '供应商编码', name: '供应商名称', category: '品类', contact: '联系人',
+  phone: '联系电话', address: '地址', performanceScore: '绩效分', riskLevel: '风险等级',
+  createdAt: '创建时间',
   // 订单
   orderNo: '订单号', supplierId: '供应商ID', supplierName: '供应商名称',
   orderStatus: '订单状态', buyer: '采购员', amount: '金额', deliveryDate: '交货日期',
@@ -53,12 +52,25 @@ const fieldLabelMap: Record<string, string> = {
   invoiceStatus: '发票状态', paymentStatus: '付款状态',
 }
 
+const supplierFieldKeys = ['code', 'name', 'category', 'contact', 'phone', 'performanceScore', 'riskLevel', 'address', 'createdAt']
+
+const riskLevelLabel: Record<string, string> = {
+  low: '低风险', medium: '中风险', high: '高风险',
+}
+
 const fields = computed<[string, unknown][]>(() => {
   if (!detail.value) return []
-  return Object.entries(detail.value)
-    .filter(([key]) => !['id'].includes(key))
-    .slice(0, 14)
-    .map(([key, value]): [string, unknown] => [fieldLabelMap[key] || key, value])
+  const isSupplier = moduleName.value === '供应商详情'
+  const keys = isSupplier ? supplierFieldKeys : Object.keys(fieldLabelMap)
+  return keys
+    .filter(key => key in detail.value!)
+    .map((key): [string, unknown] => {
+      let value = detail.value![key]
+      if (key === 'riskLevel') {
+        value = riskLevelLabel[value as string] || value
+      }
+      return [fieldLabelMap[key] || key, value]
+    })
 })
 
 const todos = ref<PortalTodo[]>([])
@@ -95,7 +107,54 @@ const loadData = async () => {
   }
 }
 
-onMounted(loadData)
+onMounted(() => {
+  loadData()
+  loadDetailData()
+})
+
+// ==================== 供应商编辑 ====================
+const showSupplierEditDialog = ref(false)
+const supplierEditFormRef = ref()
+const supplierEditForm = reactive({
+  supplierName: '', supplierShortName: '', supplierType: undefined as number | undefined,
+  contactName: '', contactPhone: '', contactEmail: '', address: '', creditCode: '', remark: '',
+})
+const supplierEditRules = {
+  supplierName: [{ required: true, message: '供应商名称不能为空', trigger: 'blur' }],
+}
+const supplierTypeOptions = [
+  { label: '原材料', value: 1 },
+  { label: '辅材', value: 2 },
+  { label: '设备', value: 3 },
+  { label: '服务', value: 4 },
+  { label: '其他', value: 5 },
+]
+
+const openSupplierEdit = async () => {
+  try {
+    const data = await supplierApi.detail(id.value)
+    supplierEditForm.supplierName = data.supplierName || ''
+    supplierEditForm.supplierShortName = data.supplierShortName || ''
+    supplierEditForm.supplierType = data.supplierType ?? undefined
+    supplierEditForm.contactName = data.contactName || ''
+    supplierEditForm.contactPhone = data.contactPhone || ''
+    supplierEditForm.contactEmail = data.contactEmail || ''
+    supplierEditForm.address = data.address || ''
+    supplierEditForm.creditCode = data.creditCode || ''
+    supplierEditForm.remark = data.remark || ''
+    showSupplierEditDialog.value = true
+  } catch { ElMessage.error('获取供应商详情失败') }
+}
+
+const submitSupplierEdit = async () => {
+  try { await supplierEditFormRef.value?.validate() } catch { return }
+  try {
+    await supplierApi.update(id.value, supplierEditForm)
+    ElMessage.success('供应商信息更新成功')
+    showSupplierEditDialog.value = false
+    loadData()
+  } catch { /* 拦截器处理 */ }
+}
 
 // ==================== 业务明细数据 ====================
 const detailLoading = ref(false)
@@ -183,7 +242,18 @@ const loadDetailData = async () => {
     const name = moduleName.value
     const bid = id.value
     if (name === '供应商详情') {
-      supplierCertificates.value = await mockApi.getCertificates(Number(bid))
+      try {
+        const result = await qualificationApi.page({ supplierId: bid, pageNum: 1, pageSize: 100 })
+        supplierCertificates.value = result.records.map(r => ({
+          id: r.id,
+          name: r.qualName,
+          certNo: r.qualNo || '',
+          expireDate: r.validEnd || '',
+          status: r.status === 1 ? 'active' : r.status === 0 ? 'pending' : 'expired',
+        }))
+      } catch {
+        supplierCertificates.value = []
+      }
     } else if (name === '订单详情') {
       // 3.2.3 使用真实API获取订单明细行
       try {
@@ -191,7 +261,7 @@ const loadDetailData = async () => {
         orderDetailLines.value = lines
       } catch {
         // 降级使用 mock
-        const mockLines = await mockApi.getOrderDetails(Number(bid))
+        const mockLines = await mockApi.getOrderDetails(bid)
         orderDetailLines.value = mockLines.map(l => ({
           orderId: bid,
           lineNo: l.lineNo,
@@ -209,19 +279,41 @@ const loadDetailData = async () => {
       }
       // 3.2.1 加载订单变更记录
       try {
-        const changes = await orderChangeApi.page({ pageNum: 1, pageSize: 50, orderId: Number(bid) || undefined })
+        const changes = await orderChangeApi.page({ pageNum: 1, pageSize: 50, orderId: bid || undefined })
         orderChanges.value = changes.records
       } catch { orderChanges.value = [] }
       // 3.2.4 加载关联发货记录
       try {
-        deliveryRecords.value = await mockApi.getDeliveryDetails(Number(bid))
+        const details = await mockApi.getDeliveryDetails(bid)
+        deliveryRecords.value = details.map((d: any, idx: number) => ({
+          lineNo: idx + 1,
+          materialCode: d.materialCode,
+          materialName: d.materialName,
+          orderLineNo: idx + 1,
+          unit: d.unit,
+          orderQty: d.planQty,
+          shipQty: d.actualQty,
+          batchNo: d.batchNo,
+          remark: d.remark,
+        }))
       } catch { deliveryRecords.value = [] }
     } else if (name === 'ASN详情') {
-      deliveryDetailLines.value = await mockApi.getDeliveryDetails(Number(bid))
+      const details = await mockApi.getDeliveryDetails(bid)
+      deliveryDetailLines.value = details.map((d: any, idx: number) => ({
+        lineNo: idx + 1,
+        materialCode: d.materialCode,
+        materialName: d.materialName,
+        orderLineNo: idx + 1,
+        unit: d.unit,
+        orderQty: d.planQty,
+        shipQty: d.actualQty,
+        batchNo: d.batchNo,
+        remark: d.remark,
+      }))
     } else if (name === '质量详情') {
-      inspectionDetailLines.value = await mockApi.getInspectionDetails(Number(bid))
+      inspectionDetailLines.value = await mockApi.getInspectionDetails(bid)
     } else if (name === '对账详情') {
-      reconDetailLines.value = await mockApi.getReconDetails(Number(bid))
+      reconDetailLines.value = await mockApi.getReconDetails(bid)
     }
   } finally {
     detailLoading.value = false
@@ -244,6 +336,7 @@ const onTabChange = (tabName: string | number) => {
 <template>
   <PageContainer :title="moduleName" subtitle="业务详情：基本信息、附件、操作日志">
     <template #actions>
+      <el-button v-if="moduleName === '供应商详情'" type="warning" @click="openSupplierEdit">编辑</el-button>
       <el-button @click="router.push(backPath)">返回列表</el-button>
       <el-button type="primary">刷新</el-button>
     </template>
@@ -252,21 +345,6 @@ const onTabChange = (tabName: string | number) => {
       <el-empty v-if="!detail" description="未找到数据记录" />
 
       <template v-else>
-        <div class="detail-head">
-          <div>
-            <div class="head-label">当前状态</div>
-            <StatusTag :value="detail.status as string" />
-          </div>
-          <div>
-            <div class="head-label">数据来源</div>
-            <strong>后端实时数据</strong>
-          </div>
-          <div>
-            <div class="head-label">业务模块</div>
-            <strong>{{ moduleName }}</strong>
-          </div>
-        </div>
-
         <el-divider />
 
         <div class="detail-grid">
@@ -498,17 +576,17 @@ const onTabChange = (tabName: string | number) => {
             </div>
           </el-tab-pane>
           <el-tab-pane label="附件">
-            <AttachmentUpload />
+            <AttachmentUpload :business-type="businessTypeMap[moduleName] || 'supplier'" :business-id="id" />
             <el-divider>附件版本</el-divider>
             <AttachmentVersionList />
             <el-divider>附件列表</el-divider>
             <AttachmentPanel :business-type="businessTypeMap[moduleName] || 'supplier'" :business-id="id" />
           </el-tab-pane>
           <el-tab-pane label="导入导出">
-            <ImportExportPanel />
+            <ImportExportPanel :module="moduleName" />
           </el-tab-pane>
           <el-tab-pane label="操作日志">
-            <OperationLogTable />
+            <OperationLogTable :module="moduleName" :business-no="id" />
           </el-tab-pane>
         </el-tabs>
       </template>
@@ -543,26 +621,55 @@ const onTabChange = (tabName: string | number) => {
         <el-button type="primary" @click="submitDiffConfirm">全部确认</el-button>
       </template>
     </el-dialog>
+
+    <!-- 供应商编辑弹窗 -->
+    <el-dialog v-model="showSupplierEditDialog" title="编辑供应商" width="620px" :close-on-click-modal="false">
+      <el-form ref="supplierEditFormRef" :model="supplierEditForm" :rules="supplierEditRules" label-width="110px">
+        <el-form-item label="供应商名称" prop="supplierName">
+          <el-input v-model="supplierEditForm.supplierName" placeholder="请输入企业全称" />
+        </el-form-item>
+        <el-form-item label="供应商简称">
+          <el-input v-model="supplierEditForm.supplierShortName" placeholder="选填" />
+        </el-form-item>
+        <el-form-item label="供应商类型">
+          <el-select v-model="supplierEditForm.supplierType" placeholder="请选择" clearable style="width:100%">
+            <el-option v-for="opt in supplierTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+          </el-select>
+        </el-form-item>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="联系人">
+              <el-input v-model="supplierEditForm.contactName" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="联系电话">
+              <el-input v-model="supplierEditForm.contactPhone" placeholder="选填" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="邮箱">
+          <el-input v-model="supplierEditForm.contactEmail" placeholder="选填" />
+        </el-form-item>
+        <el-form-item label="地址">
+          <el-input v-model="supplierEditForm.address" placeholder="选填" />
+        </el-form-item>
+        <el-form-item label="统一信用代码">
+          <el-input v-model="supplierEditForm.creditCode" placeholder="选填，须与营业执照一致" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="supplierEditForm.remark" type="textarea" :rows="2" placeholder="选填" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showSupplierEditDialog = false">取消</el-button>
+        <el-button type="primary" @click="submitSupplierEdit">保存修改</el-button>
+      </template>
+    </el-dialog>
   </PageContainer>
 </template>
 
 <style scoped>
-.detail-head {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-}
-.detail-head > div {
-  padding: 16px;
-  background: #f8fbff;
-  border: 1px solid #e4ebf3;
-  border-radius: 12px;
-}
-.head-label {
-  margin-bottom: 8px;
-  font-size: 12px;
-  color: #718096;
-}
 .detail-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

@@ -17,10 +17,18 @@ import com.supplier.security.util.SecurityUtils;
 import com.supplier.settlement.dto.ReconciliationConfirmDTO;
 import com.supplier.settlement.dto.ReconciliationCreateDTO;
 import com.supplier.settlement.entity.Reconciliation;
+import com.supplier.settlement.entity.ReconciliationDetail;
+import com.supplier.settlement.entity.ThreeWayMatch;
+import com.supplier.settlement.entity.Invoice;
 import com.supplier.settlement.mapper.ReconciliationMapper;
+import com.supplier.settlement.mapper.ReconciliationDetailMapper;
+import com.supplier.settlement.mapper.ThreeWayMatchMapper;
+import com.supplier.settlement.mapper.InvoiceMapper;
 import com.supplier.settlement.query.ReconciliationQuery;
 import com.supplier.settlement.service.ReconciliationService;
+import com.supplier.settlement.vo.ReconciliationDetailVO;
 import com.supplier.settlement.vo.ReconciliationVO;
+import com.supplier.settlement.vo.ThreeWayMatchVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,12 +36,18 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class ReconciliationServiceImpl implements ReconciliationService {
     private final ReconciliationMapper reconciliationMapper;
+    private final ReconciliationDetailMapper reconciliationDetailMapper;
+    private final ThreeWayMatchMapper threeWayMatchMapper;
+    private final InvoiceMapper invoiceMapper;
     private final PortalTodoService portalTodoService;
     private final MessageNoticeService messageNoticeService;
     private final DomainEventPublisher domainEventPublisher;
@@ -127,6 +141,127 @@ public class ReconciliationServiceImpl implements ReconciliationService {
                         .data(Map.of("businessId", reconciliation.getId(), "businessNo", reconciliation.getReconNo(),
                                 "supplierId", reconciliation.getSupplierId(), "disputed", dto.getDisputed()))
                         .build());
+    }
+
+    @Override
+    public List<ReconciliationDetailVO> getLines(Long id) {
+        getWithScope(id);
+        List<ReconciliationDetail> details = reconciliationDetailMapper.selectList(
+                new LambdaQueryWrapper<ReconciliationDetail>().eq(ReconciliationDetail::getReconId, id));
+        List<ReconciliationDetailVO> vos = new ArrayList<>();
+        for (ReconciliationDetail d : details) {
+            ReconciliationDetailVO vo = new ReconciliationDetailVO();
+            vo.setId(d.getId());
+            vo.setReconId(d.getReconId());
+            vo.setOrderId(d.getOrderId());
+            vo.setOrderNo(d.getOrderNo());
+            vo.setDeliveryId(d.getDeliveryId());
+            vo.setDeliveryNo(d.getDeliveryNo());
+            vo.setMaterialCode(d.getMaterialCode());
+            vo.setMaterialName(d.getMaterialName());
+            vo.setQuantity(d.getQuantity());
+            vo.setUnitPrice(d.getUnitPrice());
+            vo.setOrderAmount(d.getOrderAmount());
+            vo.setConfirmedAmount(d.getConfirmedAmount());
+            vo.setDiffAmount(d.getDiffAmount());
+            vo.setDiffReason(d.getDiffReason());
+            vo.setConfirmStatus(d.getConfirmStatus());
+            vo.setConfirmTime(d.getConfirmTime());
+            vo.setConfirmRemark(d.getConfirmRemark());
+            vo.setRemark(d.getRemark());
+            vos.add(vo);
+        }
+        return vos;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "对账", businessType = "reconciliation", action = "冻结对账单", businessIdExpr = "#id")
+    public void freeze(Long id, Map<String, Object> data) {
+        Reconciliation reconciliation = getWithScope(id);
+        if (Integer.valueOf(2).equals(reconciliation.getReconStatus())) {
+            throw BusinessException.of(ResultCode.STATUS_NOT_ALLOWED.getCode(), "已确认的对账单不能冻结");
+        }
+        reconciliation.setReconStatus(4);
+        if (data != null && data.get("remark") != null) {
+            reconciliation.setRemark(data.get("remark").toString());
+        }
+        reconciliationMapper.updateById(reconciliation);
+        bizStatusTrackService.writeTrack("reconciliation", reconciliation.getId(), reconciliation.getReconStatus(), 4, "冻结对账单");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @AuditLog(module = "对账", businessType = "reconciliation", action = "解冻对账单", businessIdExpr = "#id")
+    public void unfreeze(Long id, Map<String, Object> data) {
+        Reconciliation reconciliation = getWithScope(id);
+        if (!Integer.valueOf(4).equals(reconciliation.getReconStatus())) {
+            throw BusinessException.of(ResultCode.STATUS_NOT_ALLOWED.getCode(), "只有冻结状态的对账单可以解冻");
+        }
+        reconciliation.setReconStatus(1);
+        if (data != null && data.get("remark") != null) {
+            reconciliation.setRemark(data.get("remark").toString());
+        }
+        reconciliationMapper.updateById(reconciliation);
+        bizStatusTrackService.writeTrack("reconciliation", reconciliation.getId(), 4, 1, "解冻对账单");
+    }
+
+    @Override
+    public List<ThreeWayMatchVO> getThreeWayMatch(Long id) {
+        getWithScope(id);
+        List<ThreeWayMatch> matches = threeWayMatchMapper.selectList(
+                new LambdaQueryWrapper<ThreeWayMatch>().eq(ThreeWayMatch::getReconId, id));
+        List<ThreeWayMatchVO> vos = new ArrayList<>();
+        for (ThreeWayMatch m : matches) {
+            ThreeWayMatchVO vo = new ThreeWayMatchVO();
+            vo.setId(m.getId());
+            vo.setOrderId(m.getOrderId());
+            vo.setOrderNo(m.getOrderNo());
+            vo.setOrderAmount(m.getOrderAmount());
+            vo.setReceiptId(m.getReceiptId());
+            vo.setReceiptAmount(m.getReceiptAmount());
+            vo.setInvoiceId(m.getInvoiceId());
+            vo.setInvoiceNo(m.getInvoiceNo());
+            vo.setInvoiceAmount(m.getInvoiceAmount());
+            vo.setSupplierId(m.getSupplierId());
+            vo.setMatchResult(m.getMatchResult());
+            vo.setDiffAmount(m.getDiffAmount());
+            vo.setDiffReason(m.getDiffReason());
+            vo.setMatchTime(m.getMatchTime());
+            vo.setRemark(m.getRemark());
+            if (m.getMatchResult() != null) {
+                vo.setMatchResultDesc(switch (m.getMatchResult()) {
+                    case 0 -> "完全匹配";
+                    case 1 -> "部分匹配";
+                    case 2 -> "不匹配";
+                    default -> "未知";
+                });
+            }
+            vos.add(vo);
+        }
+        return vos;
+    }
+
+    @Override
+    public Map<String, Object> getInvoicableAmount(Long reconId) {
+        getWithScope(reconId);
+        List<Invoice> invoices = invoiceMapper.selectList(
+                new LambdaQueryWrapper<Invoice>().eq(Invoice::getReconId, reconId));
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        BigDecimal invoicedAmount = BigDecimal.ZERO;
+        for (Invoice inv : invoices) {
+            totalAmount = totalAmount.add(inv.getInvoiceAmount() != null ? inv.getInvoiceAmount() : BigDecimal.ZERO);
+            if (inv.getInvoiceStatus() != null && inv.getInvoiceStatus() != 5) {
+                invoicedAmount = invoicedAmount.add(inv.getInvoiceAmount() != null ? inv.getInvoiceAmount() : BigDecimal.ZERO);
+            }
+        }
+        Reconciliation recon = reconciliationMapper.selectById(reconId);
+        BigDecimal reconTotal = recon != null && recon.getTotalAmount() != null ? recon.getTotalAmount() : BigDecimal.ZERO;
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("invoicableAmount", reconTotal.subtract(invoicedAmount));
+        result.put("totalAmount", reconTotal);
+        result.put("invoicedAmount", invoicedAmount);
+        return result;
     }
 
     private void createSupplierTodo(Reconciliation reconciliation) {

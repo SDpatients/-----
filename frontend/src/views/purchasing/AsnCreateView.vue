@@ -9,6 +9,7 @@ import { orderDetailApi } from '@/api/orderDetail'
 import { supplierApi } from '@/api/supplier'
 import { toOrder, toSupplier } from '@/api/adapters'
 import { getIdempotentHeaders } from '@/utils/idempotent'
+import { toId } from '@/utils/id'
 import PageContainer from '@/components/common/PageContainer.vue'
 import DeliveryLineTable from '@/components/business/DeliveryLineTable.vue'
 import type { PurchaseOrder, Supplier, DeliveryLineItem } from '@/types/business'
@@ -26,8 +27,8 @@ const selectedOrder = ref<PurchaseOrder | null>(null)
 const orderLineOptions = ref<OrderLineOption[]>([])
 
 const form = reactive({
-  noticeNo: '', orderId: null as number | null, orderNo: '',
-  supplierId: null as number | null, supplierName: '',
+  noticeNo: '', orderId: null as string | null, orderNo: '',
+  supplierId: null as string | null, supplierName: '',
   planDeliveryDate: '', deliveryMethod: '', deliveryCompany: '',
   deliveryNo: '', driverName: '', driverPhone: '', vehicleNo: '',
   deliveryAddress: '', receiver: '', receiverPhone: '', remark: '',
@@ -44,16 +45,16 @@ const generateNoticeNo = () => {
 
 const onOrderSelect = async (order: PurchaseOrder) => {
   selectedOrder.value = order
-  form.orderId = Number(order.id)
+  form.orderId = toId(order.id)
   form.orderNo = order.orderNo
-  form.supplierId = order.supplierId != null ? Number(order.supplierId) : null
+  form.supplierId = order.supplierId != null ? toId(order.supplierId) : null
   form.supplierName = order.supplierName
   if (!form.noticeNo) generateNoticeNo()
   if (!form.planDeliveryDate) form.planDeliveryDate = order.deliveryDate || ''
   try {
     const lines = await orderDetailApi.list(order.id)
     orderLineOptions.value = lines.map(l => ({
-      lineNo: l.lineNo || Number(l.id),
+      lineNo: l.lineNo || 0,
       materialCode: l.materialCode || '',
       materialName: l.materialName || '',
       spec: l.materialSpec || '',
@@ -156,7 +157,7 @@ const toggleSupplierSelection = (row: Supplier) => {
 
 const confirmSupplierSelection = () => {
   if (!tempSelectedSupplier.value) { ElMessage.warning('请选择一个供应商'); return }
-  form.supplierId = Number(tempSelectedSupplier.value.id)
+  form.supplierId = toId(tempSelectedSupplier.value.id)
   form.supplierName = tempSelectedSupplier.value.name
   if (!form.noticeNo) generateNoticeNo()
   supplierDialogVisible.value = false
@@ -356,7 +357,7 @@ const submit = async () => {
       >
         <el-table-column width="55" align="center">
           <template #default="{ row }">
-            <el-radio :model-value="isOrderSelected(row)" @click.stop />
+            <el-radio :model-value="isOrderSelected(row)" :label="true" @click.stop />
           </template>
         </el-table-column>
         <el-table-column prop="orderNo" label="订单号" width="160" />
@@ -410,7 +411,7 @@ const submit = async () => {
       >
         <el-table-column width="55" align="center">
           <template #default="{ row }">
-            <el-radio :model-value="isSupplierSelected(row)" @click.stop />
+            <el-radio :model-value="isSupplierSelected(row)" :label="true" @click.stop />
           </template>
         </el-table-column>
         <el-table-column prop="code" label="供应商编码" width="140" />

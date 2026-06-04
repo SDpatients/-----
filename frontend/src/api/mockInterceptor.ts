@@ -7,9 +7,11 @@ import {
   suppliers, orders, asnNotices, qualityCases, settlements,
   timeline, portalTodos, attachments, importExportTasks,
   operationLogs, currentUser, permissions, supplierUser, supplierPermissions,
-  supplierQualifications, rfqRecords, quoteRecords,
+  supplierQualifications, rfqRecords, quoteRecords, quoteLineItems,
   integrationEndpoints, integrationLogs, syncTasks, materials,
+  supplierAccounts, sysDicts, dictItems,
 } from './mockData'
+import { idEquals } from '@/utils/id'
 
 // ---------- 工具函数 ----------
 
@@ -135,7 +137,7 @@ on('GET', '/v1/suppliers', async (config) => {
   return mockResponse(config, result)
 })
 on('GET', '/v1/suppliers/:id', async (config, params) => {
-  const supplier = suppliers.find((s) => s.id === Number(params.id))
+  const supplier = suppliers.find((s) => idEquals(s.id, params.id))
   return mockResponse(config, supplier || suppliers[0])
 })
 on('POST', '/v1/suppliers', async (config) => mockResponse(config, Date.now()))
@@ -147,7 +149,7 @@ on('GET', '/v1/purchase-orders', async (config) => {
   return mockResponse(config, result)
 })
 on('GET', '/v1/purchase-orders/:id', async (config, params) => {
-  const order = orders.find((o) => o.id === Number(params.id))
+  const order = orders.find((o) => idEquals(o.id, params.id))
   return mockResponse(config, order || orders[0])
 })
 on('POST', '/v1/purchase-orders', async (config) => mockResponse(config, Date.now()))
@@ -162,7 +164,7 @@ on('GET', '/v1/delivery-notices', async (config) => {
   return mockResponse(config, result)
 })
 on('GET', '/v1/delivery-notices/:id', async (config, params) => {
-  const asn = asnNotices.find((a) => a.id === Number(params.id))
+  const asn = asnNotices.find((a) => idEquals(a.id, params.id))
   return mockResponse(config, asn || asnNotices[0])
 })
 on('POST', '/v1/delivery-notices', async (config) => mockResponse(config, Date.now()))
@@ -175,12 +177,64 @@ on('GET', '/v1/quality-inspections', async (config) => {
   return mockResponse(config, result)
 })
 on('GET', '/v1/quality-inspections/:id', async (config, params) => {
-  const qc = qualityCases.find((q) => q.id === Number(params.id))
+  const qc = qualityCases.find((q) => idEquals(q.id, params.id))
   return mockResponse(config, qc || qualityCases[0])
 })
+on('GET', '/v1/quality-inspections/:id/lines', async (config) =>
+  mockResponse(config, []),
+)
 on('POST', '/v1/quality-inspections', async (config) => mockResponse(config, Date.now()))
+on('POST', '/v1/quality-inspections/from-receipt/:receiptId', async (config) => mockResponse(config, Date.now()))
 on('POST', '/v1/quality-inspections/:id/submit', async (config) => mockResponse(config, null))
 on('POST', '/v1/quality-inspections/:id/handle', async (config) => mockResponse(config, null))
+
+// ===================== Inspection Standards =====================
+on('GET', '/v1/inspection-standards', async (config) =>
+  mockResponse(config, { records: [], total: 0, pageSize: 10, pageNum: 1, pages: 0 }),
+)
+on('GET', '/v1/inspection-standards/by-material/:materialCode', async (config) => mockResponse(config, null))
+on('GET', '/v1/inspection-standards/:id', async (config) => mockResponse(config, null))
+on('POST', '/v1/inspection-standards', async (config) => mockResponse(config, Date.now()))
+on('PUT', '/v1/inspection-standards', async (config) => mockResponse(config, null))
+on('POST', '/v1/inspection-standards/:id/status', async (config) => mockResponse(config, null))
+on('DELETE', '/v1/inspection-standards/:id', async (config) => mockResponse(config, null))
+
+// ===================== NCR =====================
+on('GET', '/v1/nonconformance-reports', async (config) =>
+  mockResponse(config, { records: [], total: 0, pageSize: 10, pageNum: 1, pages: 0 }),
+)
+on('GET', '/v1/nonconformance-reports/:id', async (config) => mockResponse(config, null))
+on('POST', '/v1/nonconformance-reports', async (config) => mockResponse(config, Date.now()))
+on('POST', '/v1/nonconformance-reports/:id/submit', async (config) => mockResponse(config, null))
+on('POST', '/v1/nonconformance-reports/:id/handle', async (config) => mockResponse(config, null))
+on('POST', '/v1/nonconformance-reports/:id/verify', async (config) => mockResponse(config, null))
+on('POST', '/v1/nonconformance-reports/:id/close', async (config) => mockResponse(config, null))
+on('POST', '/v1/nonconformance-reports/:id/upload-attachment', async (config) => mockResponse(config, Date.now()))
+
+// ===================== 8D Reports =====================
+on('GET', '/v1/eight-d-reports', async (config) =>
+  mockResponse(config, { records: [], total: 0, pageSize: 10, pageNum: 1, pages: 0 }),
+)
+on('GET', '/v1/eight-d-reports/:id', async (config) => mockResponse(config, null))
+on('POST', '/v1/eight-d-reports', async (config) => mockResponse(config, Date.now()))
+on('PUT', '/v1/eight-d-reports/:id', async (config) => mockResponse(config, null))
+on('POST', '/v1/eight-d-reports/:id/submit', async (config) => mockResponse(config, null))
+on('POST', '/v1/eight-d-reports/:id/audit', async (config) => mockResponse(config, null))
+on('POST', '/v1/eight-d-reports/:id/reject', async (config) => mockResponse(config, null))
+on('POST', '/v1/eight-d-reports/:id/close', async (config) => mockResponse(config, null))
+on('POST', '/v1/eight-d-reports/:id/step-submit', async (config) => mockResponse(config, null))
+on('POST', '/v1/eight-d-reports/:id/step-approve', async (config) => mockResponse(config, null))
+on('POST', '/v1/eight-d-reports/:id/upload-attachment', async (config) => mockResponse(config, Date.now()))
+
+// ===================== Quality Appeals =====================
+on('GET', '/v1/quality-appeals', async (config) =>
+  mockResponse(config, { records: [], total: 0, pageSize: 10, pageNum: 1, pages: 0 }),
+)
+on('GET', '/v1/quality-appeals/:id', async (config) => mockResponse(config, null))
+on('POST', '/v1/quality-appeals', async (config) => mockResponse(config, Date.now()))
+on('POST', '/v1/quality-appeals/:id/submit', async (config) => mockResponse(config, null))
+on('POST', '/v1/quality-appeals/:id/approve', async (config) => mockResponse(config, null))
+on('POST', '/v1/quality-appeals/:id/reject', async (config) => mockResponse(config, null))
 
 // ===================== Reconciliations (Settlement) =====================
 on('GET', '/v1/reconciliations', async (config) => {
@@ -188,12 +242,23 @@ on('GET', '/v1/reconciliations', async (config) => {
   return mockResponse(config, result)
 })
 on('GET', '/v1/reconciliations/:id', async (config, params) => {
-  const st = settlements.find((s) => s.id === Number(params.id))
+  const st = settlements.find((s) => idEquals(s.id, params.id))
   return mockResponse(config, st || settlements[0])
 })
 on('POST', '/v1/reconciliations', async (config) => mockResponse(config, Date.now()))
 on('POST', '/v1/reconciliations/:id/send', async (config) => mockResponse(config, null))
 on('POST', '/v1/reconciliations/:id/confirm', async (config) => mockResponse(config, null))
+on('GET', '/v1/reconciliations/:id/lines', async (config) =>
+  mockResponse(config, []),
+)
+on('POST', '/v1/reconciliations/:id/freeze', async (config) => mockResponse(config, null))
+on('POST', '/v1/reconciliations/:id/unfreeze', async (config) => mockResponse(config, null))
+on('GET', '/v1/reconciliations/:id/three-way-match', async (config) =>
+  mockResponse(config, { records: [], total: 0 }),
+)
+on('GET', '/v1/reconciliations/:reconId/invoicable-amount', async (config) =>
+  mockResponse(config, { invoicableAmount: 0, totalAmount: 0, invoicedAmount: 0 }),
+)
 
 // ===================== Timeline / Todos / Attachments / Certificates =====================
 on('GET', '/v1/business-timeline', async (config) => mockResponse(config, timeline))
@@ -202,11 +267,23 @@ on('GET', '/v1/todos', async (config) => {
   return mockResponse(config, result)
 })
 on('GET', '/v1/todos/unread-count', async (config) => mockResponse(config, 3))
-on('GET', '/v1/file-attachments', async (config) => mockResponse(config, { records: attachments, total: attachments.length, pageSize: 100, pageNum: 1, pages: 1 }))
+on('GET', '/v1/file-attachments', async (config) => {
+  const businessType = (config.params?.businessType as string) || ''
+  const businessId = config.params?.businessId
+  let filtered = attachments
+  if (businessType) {
+    filtered = filtered.filter((a) => a.businessType === businessType)
+  }
+  if (businessId !== undefined && businessId !== null && businessId !== '') {
+    filtered = filtered.filter((a) => String(a.businessId) === String(businessId))
+  }
+  return mockResponse(config, { records: filtered, total: filtered.length, pageSize: 100, pageNum: 1, pages: 1 })
+})
 on('POST', '/v1/file-attachments', async (config) => mockResponse(config, Date.now()))
 on('GET', '/v1/file-attachments/:id/preview', async (config) => mockResponse(config, null))
 on('GET', '/v1/file-attachments/:id/download', async (config) => mockResponse(config, null))
 on('DELETE', '/v1/file-attachments/:id', async (config) => mockResponse(config, null))
+on('PUT', '/v1/file-attachments/:id/rename', async (config) => mockResponse(config, null))
 on('POST', '/v1/file-attachments/upload', async (config) => mockResponse(config, Date.now()))
 
 // ===================== Export Tasks =====================
@@ -231,7 +308,7 @@ on('GET', '/v1/audit-logs', async (config) => {
   return mockResponse(config, result)
 })
 on('GET', '/v1/audit-logs/:id', async (config, params) => {
-  const log = operationLogs.find((l) => l.id === Number(params.id))
+  const log = operationLogs.find((l) => idEquals(l.id, params.id))
   return mockResponse(config, log || operationLogs[0])
 })
 
@@ -293,10 +370,14 @@ on('GET', '/v1/invoices', async (config) =>
 )
 on('GET', '/v1/invoices/:id', async (config) => mockResponse(config, null))
 on('POST', '/v1/invoices', async (config) => mockResponse(config, Date.now()))
+on('POST', '/v1/invoices/ocr', async (config) => mockResponse(config, null))
 on('POST', '/v1/invoices/:id/upload', async (config) => mockResponse(config, null))
 on('POST', '/v1/invoices/:id/verify', async (config) => mockResponse(config, null))
 on('POST', '/v1/invoices/:id/certify', async (config) => mockResponse(config, null))
-on('POST', '/v1/invoices/:id/cancel', async (config) => mockResponse(config, null))
+on('POST', '/v1/invoices/:id/void', async (config) => mockResponse(config, null))
+on('GET', '/v1/invoices/:id/payments', async (config) =>
+  mockResponse(config, []),
+)
 
 on('GET', '/v1/deductions', async (config) =>
   mockResponse(config, { records: [], total: 0, pageSize: 10, pageNum: 1, pages: 0 }),
@@ -313,16 +394,43 @@ on('GET', '/v1/payments', async (config) =>
 )
 on('GET', '/v1/payments/:id', async (config) => mockResponse(config, null))
 on('POST', '/v1/payments', async (config) => mockResponse(config, Date.now()))
+on('POST', '/v1/payments/:id/submit-approval', async (config) => mockResponse(config, null))
+on('POST', '/v1/payments/:id/schedule', async (config) => mockResponse(config, null))
 on('POST', '/v1/payments/:id/pay', async (config) => mockResponse(config, null))
 on('POST', '/v1/payments/:id/reject', async (config) => mockResponse(config, null))
+on('POST', '/v1/payments/:id/cancel', async (config) => mockResponse(config, null))
+on('GET', '/v1/payments/:id/callback-logs', async (config) =>
+  mockResponse(config, []),
+)
+on('GET', '/v1/payments/:id/invoices', async (config) =>
+  mockResponse(config, []),
+)
 
-on('GET', '/v1/performances', async (config) =>
+on('GET', '/v1/supplier-performances', async (config) =>
   mockResponse(config, { records: [], total: 0, pageSize: 10, pageNum: 1, pages: 0 }),
 )
-on('GET', '/v1/performances/:id', async (config) => mockResponse(config, null))
-on('POST', '/v1/performances', async (config) => mockResponse(config, Date.now()))
-on('PUT', '/v1/performances/:id', async (config) => mockResponse(config, null))
-on('DELETE', '/v1/performances/:id', async (config) => mockResponse(config, null))
+on('GET', '/v1/supplier-performances/:id', async (config) => mockResponse(config, null))
+on('POST', '/v1/supplier-performances', async (config) => mockResponse(config, Date.now()))
+on('PUT', '/v1/supplier-performances/:id', async (config) => mockResponse(config, null))
+on('DELETE', '/v1/supplier-performances/:id', async (config) => mockResponse(config, null))
+
+// ===================== Payment Approvals =====================
+on('GET', '/v1/payment-approvals', async (config) =>
+  mockResponse(config, { records: [], total: 0, pageSize: 10, pageNum: 1, pages: 0 }),
+)
+on('GET', '/v1/payment-approvals/:id', async (config) => mockResponse(config, null))
+on('POST', '/v1/payment-approvals/submit', async (config) => mockResponse(config, null))
+on('POST', '/v1/payment-approvals/:id/approve', async (config) => mockResponse(config, null))
+on('POST', '/v1/payment-approvals/:id/reject', async (config) => mockResponse(config, null))
+
+// ===================== Reconciliation Details =====================
+on('GET', '/v1/reconciliation-details', async (config) =>
+  mockResponse(config, []),
+)
+on('GET', '/v1/reconciliation-details/:id', async (config) => mockResponse(config, null))
+on('POST', '/v1/reconciliation-details', async (config) => mockResponse(config, Date.now()))
+on('PUT', '/v1/reconciliation-details/:id', async (config) => mockResponse(config, null))
+on('DELETE', '/v1/reconciliation-details/:id', async (config) => mockResponse(config, null))
 
 // ===================== Supplier Qualifications =====================
 on('GET', '/v1/supplier-qualifications', async (config) => {
@@ -330,7 +438,7 @@ on('GET', '/v1/supplier-qualifications', async (config) => {
   return mockResponse(config, result)
 })
 on('GET', '/v1/supplier-qualifications/:id', async (config, params) => {
-  const qual = supplierQualifications.find((q) => q.id === Number(params.id))
+  const qual = supplierQualifications.find((q) => idEquals(q.id, params.id))
   return mockResponse(config, qual || supplierQualifications[0])
 })
 on('POST', '/v1/supplier-qualifications', async (config) => mockResponse(config, Date.now()))
@@ -343,7 +451,7 @@ on('GET', '/v1/rfqs', async (config) => {
   return mockResponse(config, result)
 })
 on('GET', '/v1/rfqs/:id', async (config, params) => {
-  const rfq = rfqRecords.find((r) => r.id === Number(params.id))
+  const rfq = rfqRecords.find((r) => idEquals(r.id, params.id))
   return mockResponse(config, rfq || rfqRecords[0])
 })
 on('POST', '/v1/rfqs', async (config) => mockResponse(config, Date.now()))
@@ -357,8 +465,12 @@ on('GET', '/v1/quotes', async (config) => {
   return mockResponse(config, result)
 })
 on('GET', '/v1/quotes/:id', async (config, params) => {
-  const quote = quoteRecords.find((q) => q.id === Number(params.id))
+  const quote = quoteRecords.find((q) => idEquals(q.id, params.id))
   return mockResponse(config, quote || quoteRecords[0])
+})
+on('GET', '/v1/quotes/:id/lines', async (config, params) => {
+  const lines = quoteLineItems.filter((item) => idEquals(item.quoteId, params.id))
+  return mockResponse(config, lines)
 })
 on('POST', '/v1/quotes', async (config) => mockResponse(config, Date.now()))
 on('POST', '/v1/quotes/:id/accept', async (config) => mockResponse(config, null))
@@ -372,7 +484,7 @@ on('GET', '/v1/integration-endpoints', async (config) => {
   return mockResponse(config, result)
 })
 on('GET', '/v1/integration-endpoints/:id', async (config, params) => {
-  const ep = integrationEndpoints.find((e) => e.id === Number(params.id))
+  const ep = integrationEndpoints.find((e) => idEquals(e.id, params.id))
   return mockResponse(config, ep || integrationEndpoints[0])
 })
 on('POST', '/v1/integration-endpoints', async (config) => mockResponse(config, Date.now()))
@@ -386,7 +498,7 @@ on('GET', '/v1/integration-logs', async (config) => {
   return mockResponse(config, result)
 })
 on('GET', '/v1/integration-logs/:id', async (config, params) => {
-  const log = integrationLogs.find((l) => l.id === Number(params.id))
+  const log = integrationLogs.find((l) => idEquals(l.id, params.id))
   return mockResponse(config, log || integrationLogs[0])
 })
 
@@ -395,19 +507,176 @@ on('GET', '/v1/integration-sync-tasks', async (config) => {
   return mockResponse(config, result)
 })
 on('GET', '/v1/integration-sync-tasks/:id', async (config, params) => {
-  const task = syncTasks.find((t) => t.id === Number(params.id))
+  const task = syncTasks.find((t) => idEquals(t.id, params.id))
   return mockResponse(config, task || syncTasks[0])
 })
 on('POST', '/v1/integration-sync-tasks/:id/retry', async (config) => mockResponse(config, null))
 
 // ===================== Materials =====================
 on('GET', '/v1/materials', async (config) => {
-  const result = paginate(materials as any, config.params)
+  let filtered = [...(materials as any[])]
+  const category = config.params?.category as string
+  if (category) {
+    filtered = filtered.filter((m) => m.category === category)
+  }
+  const result = paginate(filtered, config.params)
   return mockResponse(config, result)
 })
 on('GET', '/v1/materials/:id', async (config, params) => {
-  const material = materials.find((m) => m.id === Number(params.id))
+  const material = materials.find((m) => idEquals(m.id, params.id))
   return mockResponse(config, material || materials[0])
+})
+on('POST', '/v1/materials', async (config) => {
+  const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : (config.data || {})
+  const newId = Math.max(...(materials as any[]).map((m: any) => m.id), 10) + 1
+  const newMaterial = {
+    id: newId,
+    materialCode: body.materialCode,
+    materialName: body.materialName,
+    spec: body.spec || '',
+    unit: body.unit || 'PCS',
+    category: body.category || '',
+    status: 1,
+    createTime: new Date().toISOString().replace('T', ' ').slice(0, 19),
+  }
+  ;(materials as any[]).push(newMaterial)
+  return mockResponse(config, newId)
+})
+on('PUT', '/v1/materials/:id', async (config, params) => {
+  const material = materials.find((m) => idEquals(m.id, params.id))
+  if (material) {
+    const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : (config.data || {})
+    if (body.materialCode) material.materialCode = body.materialCode
+    if (body.materialName) material.materialName = body.materialName
+    if (body.spec !== undefined) material.spec = body.spec
+    if (body.unit !== undefined) material.unit = body.unit
+    if (body.category !== undefined) material.category = body.category
+  }
+  return mockResponse(config, null)
+})
+on('DELETE', '/v1/materials/:id', async (config, params) => {
+  const idx = materials.findIndex((m) => idEquals(m.id, params.id))
+  if (idx >= 0) materials.splice(idx, 1)
+  return mockResponse(config, null)
+})
+
+// ===================== Dict =====================
+on('GET', '/v1/dict/list', async (config) => mockResponse(config, [...sysDicts]))
+
+on('POST', '/v1/dict', async (config) => {
+  const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : (config.data || {})
+  const newId = Math.max(...sysDicts.map(d => d.id), 0) + 1
+  const newDict = { id: newId, dictName: body.dictName, dictCode: body.dictCode, description: body.description || '', status: 1, createTime: new Date().toISOString().replace('T', ' ').slice(0, 19) }
+  sysDicts.push(newDict)
+  dictItems[body.dictCode] = []
+  return mockResponse(config, newId)
+})
+
+on('DELETE', '/v1/dict/:id', async (config, params) => {
+  const idx = sysDicts.findIndex(d => idEquals(d.id, params.id))
+  if (idx > -1) {
+    const code = sysDicts[idx].dictCode
+    sysDicts.splice(idx, 1)
+    delete dictItems[code]
+  }
+  return mockResponse(config, null)
+})
+
+on('GET', '/v1/dict/code/:dictCode', async (config, params) => {
+  const items = dictItems[params.dictCode] || []
+  return mockResponse(config, items.filter((i: any) => i.status === 1))
+})
+
+on('GET', '/v1/dict/:dictId/items', async (config, params) => {
+  const dict = sysDicts.find(d => d.id === Number(params.dictId))
+  if (!dict) return mockResponse(config, [])
+  return mockResponse(config, dictItems[dict.dictCode] || [])
+})
+
+on('POST', '/v1/dict/items', async (config) => {
+  const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : (config.data || {})
+  const dict = sysDicts.find(d => d.id === Number(body.dictId))
+  if (!dict) return mockResponse(config, null)
+  if (!dictItems[dict.dictCode]) dictItems[dict.dictCode] = []
+  const allItems = dictItems[dict.dictCode]
+  const newId = Math.max(...allItems.map((i: any) => i.id), ...Object.values(dictItems).flat().map((i: any) => i.id), 0) + 1
+  const newItem = { id: newId, dictId: Number(body.dictId), itemLabel: body.itemLabel, itemValue: body.itemValue, sort: body.sort || 0, description: body.description || '', status: 1 }
+  allItems.push(newItem)
+  return mockResponse(config, newId)
+})
+
+on('PUT', '/v1/dict/items/:id', async (config, params) => {
+  const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : (config.data || {})
+  for (const code of Object.keys(dictItems)) {
+    const item = dictItems[code].find((i: any) => idEquals(i.id, params.id))
+    if (item) {
+      if (body.itemLabel) (item as any).itemLabel = body.itemLabel
+      if (body.itemValue) (item as any).itemValue = body.itemValue
+      if (body.sort !== undefined) (item as any).sort = body.sort
+      if (body.description !== undefined) (item as any).description = body.description
+      if (body.status !== undefined) (item as any).status = body.status
+      break
+    }
+  }
+  return mockResponse(config, null)
+})
+
+on('DELETE', '/v1/dict/items/:id', async (config, params) => {
+  for (const code of Object.keys(dictItems)) {
+    const idx = dictItems[code].findIndex((i: any) => idEquals(i.id, params.id))
+    if (idx > -1) { dictItems[code].splice(idx, 1); break }
+  }
+  return mockResponse(config, null)
+})
+
+// ===================== Supplier Accounts =====================
+on('GET', '/v1/supplier-accounts', async (config) => {
+  const supplierId = config.params?.supplierId as string | number | undefined
+  let filtered = supplierAccounts
+  if (supplierId) {
+    filtered = filtered.filter((a) => idEquals(a.supplierId, supplierId))
+  }
+  const keyword = config.params?.keyword as string
+  if (keyword) {
+    const kw = keyword.toLowerCase()
+    filtered = filtered.filter((a) =>
+      a.username.includes(kw) || a.realName.includes(kw) || a.phone.includes(kw),
+    )
+  }
+  const result = paginate(filtered as any, config.params)
+  return mockResponse(config, result)
+})
+on('GET', '/v1/supplier-accounts/:id', async (config, params) => {
+  const account = supplierAccounts.find((a) => idEquals(a.id, params.id))
+  return mockResponse(config, account || supplierAccounts[0])
+})
+on('POST', '/v1/supplier-accounts', async (config) => {
+  const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : (config.data || {})
+  const newId = Math.max(...supplierAccounts.map((a) => a.id), 300) + 1
+  const newAccount = {
+    id: newId,
+    username: body.username,
+    realName: body.realName,
+    phone: body.phone || '',
+    email: body.email || '',
+    userType: 2,
+    supplierId: body.supplierId,
+    status: 1,
+    lastLoginTime: '',
+    createTime: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    remark: body.remark || '',
+  }
+  supplierAccounts.push(newAccount)
+  return mockResponse(config, newId)
+})
+on('PUT', '/v1/supplier-accounts/:id/password', async (config) => mockResponse(config, null))
+on('PUT', '/v1/supplier-accounts/:id/status', async (config, params) => {
+  const account = supplierAccounts.find((a) => idEquals(a.id, params.id))
+  if (account) {
+    const status = config.params?.status ? Number(config.params.status) : 0
+    account.status = status
+  }
+  return mockResponse(config, null)
 })
 
 // ---------- 拦截器注册 ----------
@@ -420,11 +689,8 @@ on('GET', '/v1/materials/:id', async (config, params) => {
  */
 export const setupMock = (instance: AxiosInstance): void => {
   if (!isMockEnabled()) {
-    console.debug('[Mock] Mock 模式未启用（VITE_USE_MOCK ≠ true），所有请求走真实网络')
     return
   }
-
-  console.debug('[Mock] Mock 模式已启用，拦截生效中')
 
   instance.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     const method = (config.method || 'GET').toUpperCase()
@@ -436,7 +702,6 @@ export const setupMock = (instance: AxiosInstance): void => {
       if (params === null) continue
 
       // 匹配成功，用 mock adapter 接管请求
-      console.debug(`[Mock] ✓ ${method} ${url} → 命中 mock 处理器`)
       const adapter = async () => {
         const response = await route.handler(config, params)
         return delay(response)
@@ -445,7 +710,6 @@ export const setupMock = (instance: AxiosInstance): void => {
     }
 
     // 未匹配：兜底返回空数据，禁止穿透到后端
-    console.debug(`[Mock] ○ ${method} ${url} → 未命中，兜底返回空数据`)
     const fallbackAdapter = async () => {
       const emptyData = method === 'GET' ? [] : null
       return delay(mockResponse(config, emptyData))

@@ -11,6 +11,7 @@ export interface OrderLineOption {
   orderQty: number
   shippedQty: number
   deliveryDate: string
+  orderDetailId?: number | string
 }
 
 const props = withDefaults(defineProps<{
@@ -37,7 +38,10 @@ watch(() => props.modelValue, (val) => {
 }, { deep: true })
 
 watch(lines, (val) => {
-  emit('update:modelValue', val.map(l => ({ ...l })))
+  const newVal = val.map(l => ({ ...l }))
+  if (JSON.stringify(newVal) !== JSON.stringify(props.modelValue)) {
+    emit('update:modelValue', newVal)
+  }
 }, { deep: true })
 
 function createEmptyLine(lineNo: number): DeliveryLineItem {
@@ -46,6 +50,7 @@ function createEmptyLine(lineNo: number): DeliveryLineItem {
     materialCode: '',
     materialName: '',
     orderLineNo: 0,
+    orderDetailId: null,
     unit: '',
     orderQty: 0,
     shippedQty: 0,
@@ -74,8 +79,9 @@ function onOrderLineSelect(index: number, lineNo: number) {
   if (!selected) return
   const line = lines.value[index]
   line.orderLineNo = selected.lineNo
+  line.orderDetailId = selected.orderDetailId
   line.materialCode = selected.materialCode
-  line.materialName = `${selected.materialName} ${selected.spec}`
+  line.materialName = `${selected.materialName} ${selected.spec}`.trim()
   line.unit = selected.unit
   line.orderQty = selected.orderQty
   line.shippedQty = selected.shippedQty
@@ -106,10 +112,13 @@ const caseTotal = computed(() => lines.value.reduce((sum, l) => sum + (l.caseNo 
 
 function generateBarcode(index: number) {
   const line = lines.value[index]
+  if (!line) return
   const orderPart = (line.materialCode || 'ASN').replace(/[^A-Z0-9]/g, '').slice(0, 6)
   const dateCode = new Date().toISOString().slice(2, 10).replace(/-/g, '')
   const seq = String(index + 1).padStart(3, '0')
-  line.barcode = `${orderPart}${dateCode}${seq}`
+  const newBarcode = `${orderPart}${dateCode}${seq}`
+  // 使用新对象引用触发响应式更新
+  lines.value[index] = { ...line, barcode: newBarcode }
 }
 </script>
 
@@ -235,29 +244,24 @@ function generateBarcode(index: number) {
         </template>
       </el-table-column>
 
-      <el-table-column label="条码" width="200">
+      <el-table-column label="条码" width="220">
         <template #default="{ row, $index }">
           <div class="barcode-cell">
-            <el-input
-              v-if="!readonly"
-              v-model="row.barcode"
-              size="small"
-              placeholder="自动生成或手动输入"
-            >
-              <template #suffix>
-                <el-button
-                  link
-                  type="primary"
-                  size="small"
-                  @click="generateBarcode($index)"
-                >生成</el-button>
-              </template>
-            </el-input>
-            <div v-else-if="row.barcode" class="barcode-svg">
-              <svg :id="`barcode-${$index}`" class="barcode-img" />
-              <span class="barcode-text">{{ row.barcode }}</span>
-            </div>
-            <span v-else>-</span>
+            <template v-if="!readonly">
+              <el-input
+                v-model="row.barcode"
+                size="small"
+                placeholder="自动生成或手动输入"
+              />
+              <el-button link type="primary" size="small" @click="generateBarcode($index)">生成</el-button>
+            </template>
+            <template v-else>
+              <div v-if="row.barcode" class="barcode-svg">
+                <svg :id="`barcode-${$index}`" class="barcode-img" />
+                <span class="barcode-text">{{ row.barcode }}</span>
+              </div>
+              <span v-else>-</span>
+            </template>
           </div>
         </template>
       </el-table-column>

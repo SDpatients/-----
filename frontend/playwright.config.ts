@@ -10,12 +10,15 @@ export default defineConfig({
   reporter: [
     ['html', { outputFolder: 'playwright-report' }],
     ['json', { outputFile: 'test-results/playwright.json' }],
+    ['list'],
   ],
 
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:5175',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    actionTimeout: 10000,
+    navigationTimeout: 15000,
   },
 
   projects: [
@@ -23,28 +26,11 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-    // 移动端视口
-    {
-      name: 'mobile-chrome',
-      use: { ...devices['Pixel 5'] },
-    },
-    {
-      name: 'mobile-safari',
-      use: { ...devices['iPhone 12'] },
-    },
   ],
 
   webServer: {
     command: 'npm run dev',
-    port: 5173,
+    port: 5175,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },

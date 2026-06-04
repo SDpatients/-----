@@ -76,7 +76,7 @@ const submitForm = async () => {
   if (!valid) return
   try {
     if (editingId.value) {
-      await inspectionStandardApi.update(editingId.value, form)
+      await inspectionStandardApi.update({ ...form, id: editingId.value })
       ElMessage.success('标准已更新')
     } else {
       await inspectionStandardApi.create(form)
@@ -97,10 +97,11 @@ const handleDelete = async (row: InspectionStandard) => {
 }
 
 const handleToggle = async (row: InspectionStandard) => {
-  const action = row.status === 1 ? '停用' : '启用'
+  const newStatus = row.status === 1 ? 0 : 1
+  const action = newStatus === 1 ? '启用' : '停用'
   try {
     await ElMessageBox.confirm(`确认${action}标准「${row.standardNo}」？`, `${action}确认`)
-    await inspectionStandardApi.toggleStatus(row.id)
+    await inspectionStandardApi.toggleStatus(row.id, newStatus)
     ElMessage.success(`已${action}`)
     loadData()
   } catch { /* cancel */ }

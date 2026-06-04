@@ -5,7 +5,7 @@ import { toOrder } from '@/api/adapters'
 import type { PurchaseOrder } from '@/types/business'
 
 const props = withDefaults(defineProps<{
-  modelValue?: number | null
+  modelValue?: number | string | null
   placeholder?: string
   clearable?: boolean
 }>(), {
@@ -14,7 +14,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  'update:modelValue': [value: number | null]
+  'update:modelValue': [value: number | string | null]
   select: [order: PurchaseOrder]
 }>()
 
@@ -39,7 +39,7 @@ const remoteSearch = (keyword: string) => {
   }, 300)
 }
 
-const handleChange = (val: number | undefined) => {
+const handleChange = (val: number | string | undefined) => {
   emit('update:modelValue', val ?? null)
   if (val) {
     const selected = options.value.find(o => o.id === val)

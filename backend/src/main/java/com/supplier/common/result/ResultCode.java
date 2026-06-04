@@ -16,6 +16,7 @@ public enum ResultCode {
     DUPLICATE_SUBMIT(40902, "重复提交"),
     INTERNAL_ERROR(50001, "系统异常"),
     EXTERNAL_ERROR(50002, "外部系统异常"),
+    REDIS_ERROR(50003, "缓存服务异常"),
     BUSINESS_ERROR(40900, "业务异常");
 
     private final Integer code;

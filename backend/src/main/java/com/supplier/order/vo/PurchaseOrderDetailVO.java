@@ -1,5 +1,7 @@
 package com.supplier.order.vo;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -7,7 +9,9 @@ import java.time.LocalDate;
 
 @Data
 public class PurchaseOrderDetailVO {
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long orderId;
     private Integer lineNo;
     private String materialCode;

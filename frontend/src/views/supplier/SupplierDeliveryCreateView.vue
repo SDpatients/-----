@@ -5,8 +5,12 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { logisticsApi } from '@/api/logistics'
 import { orderApi } from '@/api/order'
+import { orderDetailApi, type OrderDetailLineItem } from '@/api/orderDetail'
 import { getIdempotentHeaders } from '@/utils/idempotent'
+import { toOrder } from '@/api/adapters'
+import { toId } from '@/utils/id'
 import PageContainer from '@/components/common/PageContainer.vue'
+import StatusTag from '@/components/business/StatusTag.vue'
 import OrderSelector from '@/components/business/OrderSelector.vue'
 import DeliveryLineTable from '@/components/business/DeliveryLineTable.vue'
 import type { PurchaseOrder, DeliveryLineItem } from '@/types/business'
@@ -24,8 +28,8 @@ const selectedOrder = ref<PurchaseOrder | null>(null)
 const orderLineOptions = ref<OrderLineOption[]>([])
 
 const form = reactive({
-  noticeNo: '', orderId: null as number | null, orderNo: '',
-  supplierId: null as number | null, supplierName: '',
+  noticeNo: '', orderId: null as string | number | null, orderNo: '',
+  supplierId: null as string | number | null, supplierName: '',
   planDeliveryDate: '', deliveryMethod: '', deliveryCompany: '',
   deliveryNo: '', driverName: '', driverPhone: '', vehicleNo: '',
   deliveryAddress: '', receiver: '', receiverPhone: '', remark: '',
@@ -42,30 +46,101 @@ const generateNoticeNo = () => {
 
 const onOrderSelect = async (order: PurchaseOrder) => {
   selectedOrder.value = order
-  form.orderId = Number(order.id)
+  form.orderId = toId(order.id)
   form.orderNo = order.orderNo
-  form.supplierId = order.supplierId != null ? Number(order.supplierId) : null
+  form.supplierId = order.supplierId != null ? toId(order.supplierId) : null
   form.supplierName = order.supplierName
   if (!form.noticeNo) generateNoticeNo()
   if (!form.planDeliveryDate) form.planDeliveryDate = order.deliveryDate || ''
 
-  // 加载订单明细行作为关联选项
+  // 加载订单明细行作为关联选项，并自动填入送货明细
   try {
-    const result = await orderApi.detail(order.id)
-    const lines = (result as any).lines || (result as any).orderLines || []
+    const lines = await orderDetailApi.list(order.id)
+    console.log('[onOrderSelect] orderDetailApi.list result:', lines, 'count:', lines.length)
+    if (lines.length === 0) {
+      console.warn('[onOrderSelect] 未找到订单明细行！')
+    }
     orderLineOptions.value = lines.map((l: any) => ({
-      lineNo: l.lineNo || l.id,
+      lineNo: l.lineNo || toId(l.id),
       materialCode: l.materialCode || '',
       materialName: l.materialName || '',
-      spec: l.spec || '',
+      spec: l.materialSpec || l.spec || '',
       unit: l.unit || '',
       orderQty: Number(l.quantity || 0),
-      shippedQty: Number(l.receivedQty || 0),
+      shippedQty: Number(l.receivedQty || l.deliveredQty || 0),
       deliveryDate: l.deliveryDate || '',
+      orderDetailId: toId(l.id),
     }))
-  } catch {
+    console.log('[onOrderSelect] orderLineOptions:', orderLineOptions.value)
+
+    // 自动将订单明细转为送货明细行
+    const availableQty = orderLineOptions.value.filter(o => o.orderQty - o.shippedQty > 0)
+    deliveryLines.value = availableQty.map((o, idx) => ({
+      lineNo: idx + 1,
+      materialCode: o.materialCode,
+      materialName: `${o.materialName} ${o.spec}`.trim(),
+      orderLineNo: o.lineNo,
+      orderDetailId: o.orderDetailId,
+      unit: o.unit,
+      orderQty: o.orderQty,
+      shippedQty: o.shippedQty,
+      shipQty: o.orderQty - o.shippedQty, // 默认发可发数量
+      batchNo: `B${dayjs().format('YYYYMMDD')}-${String(idx + 1).padStart(2, '0')}`,
+      caseNo: '',
+      qtyPerCase: 0,
+      barcode: `${o.materialCode.replace(/[^A-Z0-9]/g, '').slice(0, 6)}${dayjs().format('YYMMDD')}${String(idx + 1).padStart(3, '0')}`,
+      remark: '',
+    }))
+    form.quantity = deliveryLines.value.reduce((s, l) => s + l.shipQty, 0)
+    console.log('[onOrderSelect] deliveryLines:', deliveryLines.value, 'total qty:', form.quantity)
+  } catch (e) {
+    console.error('[onOrderSelect] error:', e)
     orderLineOptions.value = []
+    deliveryLines.value = []
+    form.quantity = 0
   }
+}
+
+// ==================== 订单弹窗 ====================
+const orderPickerVisible = ref(false)
+const orderPickerLoading = ref(false)
+const orderPickerRecords = ref<PurchaseOrder[]>([])
+const orderPickerTotal = ref(0)
+const orderPickerQuery = reactive({ pageNum: 1, pageSize: 10, keyword: '' })
+const orderPickerSelected = ref<PurchaseOrder | null>(null)
+
+const loadOrdersForPicker = async () => {
+  orderPickerLoading.value = true
+  try {
+    const params: any = { pageNum: orderPickerQuery.pageNum, pageSize: orderPickerQuery.pageSize }
+    if (orderPickerQuery.keyword) params.keyword = orderPickerQuery.keyword
+    const result = await orderApi.page(params)
+    orderPickerRecords.value = result.records.map(toOrder)
+    orderPickerTotal.value = result.total
+  } finally {
+    orderPickerLoading.value = false
+  }
+}
+
+const openOrderPicker = () => {
+  orderPickerQuery.keyword = ''
+  orderPickerQuery.pageNum = 1
+  orderPickerSelected.value = null
+  orderPickerVisible.value = true
+  loadOrdersForPicker()
+}
+
+const confirmOrderPicker = () => {
+  if (orderPickerSelected.value) {
+    onOrderSelect(orderPickerSelected.value)
+  }
+  orderPickerVisible.value = false
+}
+
+const resetOrderPickerQuery = () => {
+  orderPickerQuery.keyword = ''
+  orderPickerQuery.pageNum = 1
+  loadOrdersForPicker()
 }
 
 const totalShipQty = computed(() => deliveryLines.value.reduce((s, l) => s + l.shipQty, 0))
@@ -109,7 +184,10 @@ const submit = async () => {
 
     <el-form ref="formRef" :model="form" :rules="formRules" label-width="120px" style="max-width: 760px">
       <el-form-item label="关联订单" prop="orderId">
-        <OrderSelector v-model="form.orderId" @select="onOrderSelect" />
+        <div style="display:flex;gap:8px;width:100%">
+          <OrderSelector v-model="form.orderId" @select="onOrderSelect" style="flex:1" />
+          <el-button type="primary" @click="openOrderPicker">查询订单</el-button>
+        </div>
       </el-form-item>
 
       <template v-if="selectedOrder">
@@ -228,5 +306,43 @@ const submit = async () => {
         <el-button size="large" @click="router.push('/supplier/deliveries')">取消</el-button>
       </el-form-item>
     </el-form>
+
+    <!-- 订单选择弹窗 -->
+    <el-dialog v-model="orderPickerVisible" title="选择关联订单" width="950px" :close-on-click-modal="false">
+      <div style="margin-bottom:12px">
+        <el-form inline :model="orderPickerQuery" @submit.prevent="loadOrdersForPicker">
+          <el-form-item label="关键词">
+            <el-input v-model="orderPickerQuery.keyword" placeholder="订单号" clearable @clear="resetOrderPickerQuery" @keyup.enter="loadOrdersForPicker" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="loadOrdersForPicker">查询</el-button>
+            <el-button @click="resetOrderPickerQuery">重置</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+      <el-table v-loading="orderPickerLoading" :data="orderPickerRecords" border highlight-current-row @current-change="row => orderPickerSelected = row">
+        <el-table-column prop="orderNo" label="订单号" width="160" />
+        <el-table-column prop="supplierName" label="供应商" min-width="120" />
+        <el-table-column prop="amount" label="金额" width="120" />
+        <el-table-column prop="deliveryDate" label="要求交期" width="120" />
+        <el-table-column label="确认状态" width="100">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.confirmStatus === '已确认' ? 'success' : row.confirmStatus === '已拒单' ? 'danger' : 'info'">
+              {{ row.confirmStatus }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="110"><template #default="{ row }"><StatusTag :value="row.status" /></template></el-table-column>
+      </el-table>
+      <el-pagination
+        v-model:current-page="orderPickerQuery.pageNum" v-model:page-size="orderPickerQuery.pageSize"
+        :total="orderPickerTotal" layout="total, prev, pager, next" class="mt-4"
+        @current-change="loadOrdersForPicker"
+      />
+      <template #footer>
+        <el-button @click="orderPickerVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!orderPickerSelected" @click="confirmOrderPicker">确认选择</el-button>
+      </template>
+    </el-dialog>
   </PageContainer>
 </template>

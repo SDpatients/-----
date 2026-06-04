@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -85,6 +86,15 @@ public class SysFileAttachmentController {
     @PreAuthorize("isAuthenticated()")
     public Result<Void> disable(@PathVariable @NotNull(message = "附件ID不能为空") Long id) {
         service.disable(id);
+        return Result.success();
+    }
+
+    @PutMapping("/{id}/rename")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Void> rename(@PathVariable @NotNull(message = "附件ID不能为空") Long id,
+                               @RequestBody java.util.Map<String, String> body) {
+        String fileName = body.get("fileName");
+        service.rename(id, fileName);
         return Result.success();
     }
 }

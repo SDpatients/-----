@@ -8,7 +8,6 @@ import java.math.BigDecimal;
 
 @Data
 public class QualityInspectionCreateDTO {
-    @NotNull(message = "收货记录ID不能为空")
     private Long receiptId;
     private Long deliveryId;
     private Long supplierId;

@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { orderChangeApi, type OrderChangeItem, type OrderChangeQuery } from '@/api/orderChange'
 import { orderApi } from '@/api/order'
 import { toOrder } from '@/api/adapters'
+import { toId } from '@/utils/id'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import OrderSelector from '@/components/business/OrderSelector.vue'
@@ -21,7 +22,7 @@ watch(activeTab, () => {
 const loading = ref(false)
 const records = ref<OrderChangeItem[]>([])
 const total = ref(0)
-const query = reactive<OrderChangeQuery & { orderId: number | null }>({ pageNum: 1, pageSize: 10, orderId: null })
+const query = reactive<OrderChangeQuery & { orderId: string | number | null }>({ pageNum: 1, pageSize: 10, orderId: null })
 
 const changeTypeMap: Record<number, string> = { 1: '数量变更', 2: '价格变更', 3: '交期变更', 4: '其他' }
 const approveStatusMap: Record<number, string> = { 0: '待审批', 1: '已通过', 2: '已驳回' }
@@ -69,7 +70,7 @@ const handleRejectChange = async (row: OrderChangeItem) => {
 const showCreateDialog = ref(false)
 const selectedOrder = ref<PurchaseOrder | null>(null)
 const createForm = reactive({
-  orderId: null as number | null,
+  orderId: null as string | number | null,
   orderDetailId: undefined as number | undefined,
   changeType: 1,
   changeContent: '',
@@ -80,7 +81,7 @@ const createForm = reactive({
 
 const onOrderSelect = (order: PurchaseOrder) => {
   selectedOrder.value = order
-  createForm.orderId = Number(order.id)
+  createForm.orderId = toId(order.id)
 }
 
 const openCreateDialog = () => {
@@ -141,7 +142,7 @@ onMounted(loadChanges)
           <div class="search-panel">
             <el-form inline :model="query" @submit.prevent="loadChanges">
               <el-form-item label="关联订单">
-                <OrderSelector v-model="query.orderId" style="width: 260px" @select="(o: PurchaseOrder) => query.orderId = Number(o.id)" />
+                <OrderSelector v-model="query.orderId" style="width: 260px" @select="(o: PurchaseOrder) => query.orderId = toId(o.id)" />
               </el-form-item>
               <el-form-item>
                 <el-button type="primary" @click="loadChanges">查询</el-button>

@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import { logisticsApi } from '@/api/logistics'
 import { mockApi } from '@/api/mockApi'
 import { toAsn } from '@/api/adapters'
+import { toId } from '@/utils/id'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import ExportDialog from '@/components/business/ExportDialog.vue'
@@ -28,7 +29,10 @@ const loadData = async () => {
     if (query.keyword) params.keyword = query.keyword
     if (query.deliveryStatus !== undefined && query.deliveryStatus !== null) params.deliveryStatus = query.deliveryStatus
     const result = await logisticsApi.deliveryPage(params as any)
-    records.value = result.records.map(toAsn)
+    records.value = result.records.map(item => ({
+      ...toAsn(item),
+      rawStatus: item.deliveryStatus ?? item.status ?? 0,
+    }))
     total.value = result.total
     if (result.total === 0) query.pageNum = 1
   } finally {
@@ -50,10 +54,34 @@ const handleShip = async (row: AsnNotice) => {
   } catch { /* 拦截器处理 */ }
 }
 
+const handleArrive = async (row: AsnNotice) => {
+  try {
+    await logisticsApi.arrive(row.id)
+    ElMessage.success('已标记送达')
+    loadData()
+  } catch { /* 拦截器处理 */ }
+}
+
 const handlePrint = async (row: AsnNotice) => {
   try {
-    const lines = await mockApi.getDeliveryDetails(Number(row.id))
-    printLines.value = lines as unknown as DeliveryLineItem[]
+    const details = await mockApi.getDeliveryDetails(toId(row.id))
+    // 将后端字段映射为前端打印模板期望的字段
+    printLines.value = (details as any[]).map((d, idx) => ({
+      lineNo: idx + 1,
+      materialCode: d.materialCode,
+      materialName: d.materialName,
+      materialSpec: d.materialSpec,
+      orderLineNo: idx + 1,
+      unit: d.unit,
+      orderQty: d.planQty,
+      shippedQty: d.actualQty,
+      shipQty: d.actualQty,
+      batchNo: d.batchNo,
+      caseNo: d.caseNo || '',
+      qtyPerCase: d.qtyPerCase || 0,
+      barcode: d.barcode || '',
+      remark: d.remark || '',
+    }))
   } catch {
     printLines.value = []
   }
@@ -99,8 +127,12 @@ onMounted(loadData)
       <el-table-column label="状态" width="110"><template #default="{ row }"><StatusTag :value="row.status" /></template></el-table-column>
       <el-table-column label="操作" min-width="200">
         <template #default="{ row }">
-          <el-button link type="success" @click="handleShip(row)">确认发货</el-button>
+          <el-button link type="primary" @click="router.push(`/supplier/deliveries/${row.id}`)">详情</el-button>
+          <el-button v-if="row.rawStatus === 0" link type="success" @click="handleShip(row)">确认发货</el-button>
+          <el-button v-if="row.rawStatus === 1" link type="primary" @click="handleArrive(row)">确认送达</el-button>
           <el-button link type="primary" @click="handlePrint(row)">打印</el-button>
+          <el-tag v-if="row.rawStatus === 1" size="small" type="success">已发货</el-tag>
+          <el-tag v-if="row.rawStatus >= 2" size="small">已处理</el-tag>
         </template>
       </el-table-column>
     </el-table>

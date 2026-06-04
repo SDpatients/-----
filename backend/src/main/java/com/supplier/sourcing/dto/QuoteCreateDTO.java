@@ -5,7 +5,8 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.util.List;
 
 @Data
 public class QuoteCreateDTO {
@@ -23,7 +24,11 @@ public class QuoteCreateDTO {
     private BigDecimal exchangeRate;
     private BigDecimal totalAmount;
     private BigDecimal taxAmount;
+    private BigDecimal taxRate;
+    private String taxMode;
     private String paymentTerms;
-    private LocalDateTime validUntil;
+    private LocalDate validUntil;
     private String remark;
+
+    private List<QuoteItemCreateDTO> lines;
 }

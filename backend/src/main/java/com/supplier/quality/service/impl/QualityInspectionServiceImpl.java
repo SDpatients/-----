@@ -35,6 +35,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -170,6 +171,56 @@ public class QualityInspectionServiceImpl implements QualityInspectionService {
         inspection.setHandleRemark(dto.getHandleRemark());
         qualityInspectionMapper.updateById(inspection);
         bizStatusTrackService.writeTrack("quality_inspection", inspection.getId(), inspection.getInspectResult(), null, "处理检验结果: " + dto.getHandleMethod());
+    }
+
+    @Override
+    public List<Map<String, Object>> getLines(Long id) {
+        QualityInspection inspection = getWithScope(id);
+        List<Map<String, Object>> lines = new java.util.ArrayList<>();
+        Map<String, Object> line = new java.util.LinkedHashMap<>();
+        line.put("id", inspection.getId());
+        line.put("inspectionNo", inspection.getInspectionNo());
+        line.put("materialCode", inspection.getMaterialCode());
+        line.put("materialName", inspection.getMaterialName());
+        line.put("inspectQty", inspection.getInspectQty());
+        line.put("qualifiedQty", inspection.getQualifiedQty());
+        line.put("unqualifiedQty", inspection.getUnqualifiedQty());
+        line.put("inspectResult", inspection.getInspectResult());
+        line.put("inspectRemark", inspection.getInspectRemark());
+        lines.add(line);
+        return lines;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createFromReceipt(Long receiptId, Map<String, Object> data) {
+        QualityInspectionCreateDTO dto = new QualityInspectionCreateDTO();
+        dto.setReceiptId(receiptId);
+        if (data.get("deliveryId") != null) {
+            dto.setDeliveryId(Long.valueOf(data.get("deliveryId").toString()));
+        }
+        if (data.get("materialCode") != null) {
+            dto.setMaterialCode(data.get("materialCode").toString());
+        }
+        if (data.get("materialName") != null) {
+            dto.setMaterialName(data.get("materialName").toString());
+        }
+        if (data.get("inspectQty") != null) {
+            dto.setInspectQty(new java.math.BigDecimal(data.get("inspectQty").toString()));
+        }
+        if (data.get("inspectType") != null) {
+            dto.setInspectType(Integer.valueOf(data.get("inspectType").toString()));
+        }
+        if (data.get("supplierId") != null) {
+            dto.setSupplierId(Long.valueOf(data.get("supplierId").toString()));
+        }
+        if (data.get("standardId") != null) {
+            dto.setStandardId(Long.valueOf(data.get("standardId").toString()));
+        }
+        if (data.get("inspectRemark") != null) {
+            dto.setInspectRemark(data.get("inspectRemark").toString());
+        }
+        return create(dto);
     }
 
     // ---- 6.3: 自动创建 NCR ----

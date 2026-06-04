@@ -13,9 +13,9 @@ import DeductionSection from '@/components/business/DeductionSection.vue'
 import type { Settlement } from '@/types/business'
 
 const userStore = useUserStore()
-const supplierId = computed(() => {
+const supplierId = computed<string | null>(() => {
   const dept = userStore.user?.department
-  if (dept?.startsWith('供应商ID：')) return Number(dept.replace('供应商ID：', ''))
+  if (dept?.startsWith('供应商ID：')) return dept.replace('供应商ID：', '')
   return null
 })
 
@@ -81,12 +81,11 @@ onMounted(loadRecon)
             </el-form-item>
             <el-form-item label="状态">
               <el-select v-model="reconQuery.reconStatus" placeholder="全部" clearable style="width: 160px" @change="loadRecon">
-                <el-option label="待对账" :value="0" />
-                <el-option label="对账中" :value="1" />
+                <el-option label="草稿" :value="0" />
+                <el-option label="已发送" :value="1" />
                 <el-option label="已确认" :value="2" />
-                <el-option label="有异议" :value="3" />
-                <el-option label="已完成" :value="4" />
-                <el-option label="已冻结" :value="5" />
+                <el-option label="有争议" :value="3" />
+                <el-option label="已关闭" :value="4" />
               </el-select>
             </el-form-item>
             <el-form-item>

@@ -81,7 +81,8 @@ class SettlementIntegrationTest extends BaseApiTest {
             Long id = objectMapper.readTree(response).get("data").asLong();
             mockMvc.perform(post("/v1/deductions/" + id + "/submit")
                             .header("Authorization", "Bearer " + adminToken)
-                            .contentType("application/json"))
+                            .contentType("application/json")
+                            .content("{}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
         }

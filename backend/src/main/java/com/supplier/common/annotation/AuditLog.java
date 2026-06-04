@@ -18,4 +18,8 @@ public @interface AuditLog {
     String businessIdExpr() default "";
     /** SpEL 表达式获取业务单号，如 "#dto.orderNo" */
     String businessNoExpr() default "";
+    /** 操作前状态，支持整数字面量(如 "0")或参数引用(如 "#status") */
+    String beforeStatusExpr() default "";
+    /** 操作后状态，支持整数字面量(如 "1")或参数引用(如 "#status") */
+    String afterStatusExpr() default "";
 }

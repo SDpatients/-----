@@ -1,5 +1,7 @@
 package com.supplier.quality.vo;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -8,10 +10,14 @@ import java.time.LocalDateTime;
 @Data
 public class NonconformanceReportVO {
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
     private String ncrNo;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long inspectionId;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long receiptId;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long supplierId;
     private String materialCode;
     private String materialName;

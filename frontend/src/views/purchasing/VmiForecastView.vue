@@ -5,6 +5,7 @@ import { vmiApi, forecastApi, type VmiInventoryQuery, type VmiInventorySyncDTO }
 import { supplierApi } from '@/api/supplier'
 import { materialApi } from '@/api/material'
 import { toSupplier } from '@/api/adapters'
+import { toId } from '@/utils/id'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import type { Supplier } from '@/types/business'
@@ -99,9 +100,9 @@ const toggleSupplierSelection = (row: Supplier) => {
 const confirmSupplierSelection = () => {
   if (!tempSelectedSupplier.value) { ElMessage.warning('请选择一个供应商'); return }
   if (supplierTarget === 'sync') {
-    syncForm.supplierId = Number(tempSelectedSupplier.value.id)
+    syncForm.supplierId = toId(tempSelectedSupplier.value.id)
   } else {
-    forecastCreateForm.supplierId = Number(tempSelectedSupplier.value.id)
+    forecastCreateForm.supplierId = toId(tempSelectedSupplier.value.id)
   }
   supplierDialogVisible.value = false
 }
@@ -228,7 +229,7 @@ const forecastFormRules: FormRules = {
 }
 const showForecastCreate = ref(false)
 const forecastCreateForm = reactive({
-  supplierId: null as number | null, materialCode: '',
+  supplierId: null as string | null, materialCode: '',
   demandDate: '', demandQty: 0, demandType: 1,
 })
 
@@ -369,7 +370,7 @@ onMounted(loadVmi)
               选择供应商
             </el-button>
             <span v-if="!syncForm.supplierId" class="select-hint">点击从供应商库选择</span>
-            <el-tag v-else type="success" closable @close="syncForm.supplierId = null">已选</el-tag>
+            <el-tag v-else type="success" closable @close="syncForm.supplierId = ''">已选</el-tag>
           </div>
         </el-form-item>
         <el-form-item label="物料" prop="materialCode">
@@ -484,7 +485,7 @@ onMounted(loadVmi)
       >
         <el-table-column width="55" align="center">
           <template #default="{ row }">
-            <el-radio :model-value="isSupplierSelected(row)" @click.stop />
+            <el-radio :model-value="isSupplierSelected(row)" :label="true" @click.stop />
           </template>
         </el-table-column>
         <el-table-column prop="code" label="供应商编码" width="140" />
@@ -533,7 +534,7 @@ onMounted(loadVmi)
       >
         <el-table-column width="55" align="center">
           <template #default="{ row }">
-            <el-radio :model-value="isMaterialSelected(row)" @click.stop />
+            <el-radio :model-value="isMaterialSelected(row)" :label="true" @click.stop />
           </template>
         </el-table-column>
         <el-table-column prop="code" label="物料编码" width="140" />

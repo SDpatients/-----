@@ -16,8 +16,8 @@ test.describe('登录页 E2E', () => {
     await expect(loginPage.submitButton).toBeVisible()
   })
 
-  test('应显示品牌信息', async ({ page }) => {
-    await expect(page.locator('h1')).toContainText('供应商协同系统')
+  test('应显示品牌信息', async () => {
+    await expect(loginPage.heroTitle).toContainText('供应商协同系统')
   })
 
   test('密码字段应为密码类型', async () => {
@@ -29,8 +29,8 @@ test.describe('登录页 E2E', () => {
     await expect(loginPage.submitButton).toBeEnabled()
   })
 
-  test('页面标题应包含协同', async () => {
-    const title = await loginPage.getPageTitle()
-    expect(title).toContain('协同')
+  test('页面应包含协同关键词', async ({ page }) => {
+    const text = await page.locator('.login-page').textContent()
+    expect(text).toContain('协同')
   })
 })

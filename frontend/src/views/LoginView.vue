@@ -3,6 +3,7 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { ApiError } from '@/utils/request'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -15,6 +16,12 @@ const submit = async () => {
     await userStore.login(form.username, form.password)
     ElMessage.success('登录成功')
     router.replace(userStore.user?.userType === 'supplier' ? '/supplier/dashboard' : '/purchasing/dashboard')
+  } catch (e: unknown) {
+    if (e instanceof ApiError && e.code === 50003) {
+      ElMessage.error('缓存服务未启动，请联系管理员检查Redis服务')
+    } else if (e instanceof ApiError && e.message?.includes('Redis')) {
+      ElMessage.error('缓存服务连接异常，请联系管理员检查Redis服务')
+    }
   } finally {
     loading.value = false
   }

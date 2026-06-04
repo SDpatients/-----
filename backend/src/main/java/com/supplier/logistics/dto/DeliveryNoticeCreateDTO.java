@@ -1,5 +1,6 @@
 package com.supplier.logistics.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -36,5 +37,6 @@ public class DeliveryNoticeCreateDTO {
 
     @NotEmpty(message = "ASN明细行不能为空")
     @Valid
+    @JsonProperty("lines")
     private List<DeliveryDetailItemDTO> details;
 }

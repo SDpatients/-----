@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Data
 public class SupplierQualificationCreateDTO {
@@ -20,8 +20,8 @@ public class SupplierQualificationCreateDTO {
 
     private String qualNo;
     private String qualOrg;
-    private LocalDateTime validStart;
-    private LocalDateTime validEnd;
+    private LocalDate validStart;
+    private LocalDate validEnd;
     private Long fileId;
     private Integer remindDays;
     private String remark;
