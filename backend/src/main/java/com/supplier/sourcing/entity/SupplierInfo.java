@@ -38,7 +38,6 @@ public class SupplierInfo extends BaseEntity {
     private String taxNumber;
     private String invoiceAddress;
     private String invoicePhone;
-    private Integer rating;
     private Integer status;
     private LocalDateTime submitTime;
     private LocalDateTime auditTime;

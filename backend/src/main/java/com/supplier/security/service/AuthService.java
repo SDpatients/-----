@@ -5,6 +5,7 @@ import com.supplier.security.dto.LoginResponse;
 import com.supplier.security.model.LoginUser;
 import com.supplier.security.util.JwtUtil;
 import com.supplier.system.entity.SysUser;
+import com.supplier.system.mapper.SysUserMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -33,6 +35,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final RedisTemplate<String, Object> redisTemplate;
     private final HttpServletRequest request;
+    private final SysUserMapper sysUserMapper;
 
     @Value("${jwt.expiration:86400000}")
     private Long expiration;
@@ -43,6 +46,9 @@ public class AuthService {
 
         Authentication authentication = authenticationManager.authenticate(authenticationToken);
         SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        // 更新最后登录时间和IP
+        updateLoginInfo(authentication);
 
         Map<String, Object> claims = new HashMap<>();
         String token = jwtUtil.generateToken(loginRequest.getUsername(), claims);
@@ -106,5 +112,29 @@ public class AuthService {
         return LoginResponse.UserInfo.builder()
                 .username(authentication == null ? null : authentication.getName())
                 .build();
+    }
+
+    private void updateLoginInfo(Authentication authentication) {
+        if (authentication != null && authentication.getPrincipal() instanceof LoginUser loginUser) {
+            SysUser user = loginUser.getUser();
+            SysUser update = new SysUser();
+            update.setId(user.getId());
+            update.setLastLoginTime(LocalDateTime.now());
+            update.setLastLoginIp(getClientIp());
+            sysUserMapper.updateById(update);
+        }
+    }
+
+    private String getClientIp() {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (StringUtils.hasText(ip) && !"unknown".equalsIgnoreCase(ip)) {
+            int index = ip.indexOf(',');
+            return index > 0 ? ip.substring(0, index).trim() : ip.trim();
+        }
+        ip = request.getHeader("X-Real-IP");
+        if (StringUtils.hasText(ip) && !"unknown".equalsIgnoreCase(ip)) {
+            return ip.trim();
+        }
+        return request.getRemoteAddr();
     }
 }

@@ -20,6 +20,7 @@ public class PortalTodoVO {
     private Long businessId;
     private String businessNo;
     private String title;
+    private String module;
     private Integer todoStatus;
     private LocalDateTime dueTime;
     private LocalDateTime finishTime;

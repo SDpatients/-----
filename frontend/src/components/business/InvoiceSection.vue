@@ -2,6 +2,7 @@
 import { reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { invoiceApi } from '@/api/finance'
+import { formatDateDisplay } from '@/lib/utils'
 import StatusTag from '@/components/business/StatusTag.vue'
 import SupplierSelector from '@/components/business/SupplierSelector.vue'
 import type { OcrResult } from '@/api/mockData'
@@ -269,7 +270,9 @@ const openVerifyDetail = (row: any) => {
         <el-table-column v-if="isPurchasing" prop="supplierName" label="供应商" min-width="200" />
         <el-table-column prop="invoiceAmount" label="发票金额" width="120" />
         <el-table-column prop="taxAmount" label="税额" width="120" />
-        <el-table-column prop="invoiceDate" label="开票日期" width="120" />
+        <el-table-column label="开票日期" width="120">
+          <template #default="{ row }">{{ formatDateDisplay(row.invoiceDate) }}</template>
+        </el-table-column>
         <el-table-column label="状态" width="120">
           <template #default="{ row }">
             <span style="display:flex;align-items:center;gap:4px;">
@@ -375,7 +378,7 @@ const openVerifyDetail = (row: any) => {
             <el-descriptions :column="1" border size="small">
               <el-descriptions-item label="发票号码">{{ ocrResult.invoiceNo }}</el-descriptions-item>
               <el-descriptions-item label="发票代码">{{ ocrResult.invoiceCode }}</el-descriptions-item>
-              <el-descriptions-item label="开票日期">{{ ocrResult.invoiceDate }}</el-descriptions-item>
+              <el-descriptions-item label="开票日期">{{ formatDateDisplay(ocrResult.invoiceDate) }}</el-descriptions-item>
               <el-descriptions-item label="发票金额">&yen; {{ ocrResult.invoiceAmount.toLocaleString() }}</el-descriptions-item>
               <el-descriptions-item label="税额">&yen; {{ ocrResult.taxAmount.toLocaleString() }}</el-descriptions-item>
               <el-descriptions-item label="销方名称">{{ ocrResult.sellerName }}</el-descriptions-item>
@@ -399,7 +402,7 @@ const openVerifyDetail = (row: any) => {
           <el-descriptions-item label="供应商">{{ verifyDetailRow.supplierName }}</el-descriptions-item>
           <el-descriptions-item label="金额">&yen; {{ verifyDetailRow.invoiceAmount?.toLocaleString() }}</el-descriptions-item>
           <el-descriptions-item label="税额">&yen; {{ verifyDetailRow.taxAmount?.toLocaleString() }}</el-descriptions-item>
-          <el-descriptions-item label="开票日期">{{ verifyDetailRow.invoiceDate }}</el-descriptions-item>
+          <el-descriptions-item label="开票日期">{{ formatDateDisplay(verifyDetailRow.invoiceDate) }}</el-descriptions-item>
           <el-descriptions-item label="验真状态">
             <el-tag type="success">验真通过</el-tag>
           </el-descriptions-item>
@@ -422,7 +425,9 @@ const openVerifyDetail = (row: any) => {
         <el-table-column label="付款状态" width="100">
           <template #default="{ row }"><StatusTag :value="row.paymentStatus" prefix="付款" /></template>
         </el-table-column>
-        <el-table-column prop="paymentTime" label="付款时间" width="160" />
+        <el-table-column label="付款时间" width="160">
+          <template #default="{ row }">{{ formatDateDisplay(row.paymentTime) }}</template>
+        </el-table-column>
       </el-table>
       <el-empty v-if="!linkedPaymentsLoading && !linkedPayments.length" description="暂无关联付款记录" />
       <template #footer>

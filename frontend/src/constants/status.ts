@@ -17,8 +17,10 @@ export const statusMap: Record<string, { label: string; type: TagType }> = {
   '订单0': { label: '草稿', type: 'info' },
   '订单1': { label: '待确认', type: 'warning' },
   '订单2': { label: '已确认', type: 'success' },
-  '订单7': { label: '已取消', type: 'info' },
-  '订单8': { label: '已拒单', type: 'danger' },
+  '订单3': { label: '部分发货', type: 'primary' },
+  '订单4': { label: '已完成', type: 'success' },
+  '订单5': { label: '已取消', type: 'info' },
+  '订单6': { label: '已拒单', type: 'danger' },
   // 送货状态
   '送货0': { label: '待发货', type: 'warning' },
   '送货1': { label: '已发货', type: 'primary' },
@@ -88,6 +90,8 @@ export const statusMap: Record<string, { label: string; type: TagType }> = {
   'QT2': { label: '已采纳', type: 'success' },
   'QT3': { label: '未采纳', type: 'danger' },
   'QT4': { label: '已撤回', type: 'info' },
+  'QT5': { label: '已定价', type: 'success' },
+  'QT6': { label: '议价中', type: 'primary' },
   // 黑名单
   'BLK0': { label: '已解除', type: 'success' },
   'BLK1': { label: '生效中', type: 'danger' },
@@ -131,6 +135,8 @@ export const riskMap: Record<string, { label: string; type: TagType }> = {
   low: { label: '低风险', type: 'success' },
   medium: { label: '中风险', type: 'warning' },
   high: { label: '高风险', type: 'danger' },
+  warning: { label: '需关注', type: 'warning' },
+  danger: { label: '高风险', type: 'danger' },
   none: { label: '无风险', type: 'info' },
   blacklisted: { label: '已拉黑', type: 'danger' },
 }

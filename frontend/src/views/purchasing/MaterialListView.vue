@@ -6,6 +6,7 @@ import { useDictStore } from '@/stores/dict'
 import PageContainer from '@/components/common/PageContainer.vue'
 import ExportDialog from '@/components/business/ExportDialog.vue'
 import type { Material } from '@/types/business'
+import { formatDateDisplay } from '@/lib/utils'
 import dayjs from 'dayjs'
 
 const dictStore = useDictStore()
@@ -146,12 +147,9 @@ onMounted(() => {
           <span v-else class="text-muted">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="状态" width="80" align="center">
-        <template #default="{ row }">
-          <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">{{ row.status === 1 ? '启用' : '禁用' }}</el-tag>
-        </template>
+      <el-table-column label="创建时间" width="170">
+        <template #default="{ row }">{{ formatDateDisplay(row.createTime) }}</template>
       </el-table-column>
-      <el-table-column prop="createTime" label="创建时间" width="170" />
       <el-table-column label="操作" width="150" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>

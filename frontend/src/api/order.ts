@@ -6,6 +6,7 @@ export interface PurchaseOrderQuery {
   pageSize: number
   keyword?: string
   orderStatus?: number
+  excludeStatuses?: number[]
   supplierId?: number | string
   startDate?: string
   endDate?: string

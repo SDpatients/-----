@@ -2,6 +2,7 @@
 import { ref, reactive, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { supplierAccountApi, type SupplierAccount, type SupplierAccountCreateForm } from '@/api/supplierAccount'
+import { formatDateDisplay } from '@/lib/utils'
 
 const props = defineProps<{
   visible: boolean
@@ -153,7 +154,9 @@ watch(() => props.visible, (val) => {
           <el-tag :type="statusType(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="lastLoginTime" label="最后登录" width="170" />
+      <el-table-column label="最后登录" width="170">
+        <template #default="{ row }">{{ formatDateDisplay(row.lastLoginTime) }}</template>
+      </el-table-column>
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openResetDialog(row)">重置密码</el-button>

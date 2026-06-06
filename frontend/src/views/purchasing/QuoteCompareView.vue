@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { quoteApi, rfqApi } from '@/api/sourcing'
+import { formatDateDisplay } from '@/lib/utils'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import type { QuoteRecord, RfqRecord, RfqLineItem, QuoteLineItem, RfqSummaryRecord } from '@/types/business'
@@ -9,7 +10,15 @@ import type { QuoteRecord, RfqRecord, RfqLineItem, QuoteLineItem, RfqSummaryReco
 const loading = ref(false)
 
 const rfqRecords = ref<RfqSummaryRecord[]>([])
-const query = reactive({ rfqNo: '', rfqTitle: '' })
+const query = reactive({ rfqNo: '', rfqTitle: '', rfqStatus: null as number | null })
+
+// 默认排序条件：按截止交期升序（最近的排最前面）
+type SortField = 'quoteDeadline' | 'latestQuoteTime' | 'createTime' | null
+const sortBy = ref<SortField>(null)
+const sortOrder = ref<'asc' | 'desc'>('asc')
+
+// 默认筛选状态：已发布(1)、报价中(2)
+const defaultStatusFilter = [1, 2] as number[]
 
 // 报价缓存 & 展开行 key 集合
 const quoteCache = ref<Record<number | string, QuoteRecord[]>>({})
@@ -45,12 +54,42 @@ const loadData = async () => {
   try {
     const list = await quoteApi.listRfqWithQuotes()
     let filtered = list
+    // 默认只显示「已发布」「报价中」状态，除非用户选择「全部」或其他特定状态
+    if (query.rfqStatus === null) {
+      filtered = filtered.filter(r => defaultStatusFilter.includes(r.rfqStatus))
+    } else if (query.rfqStatus !== -1) {
+      // -1 表示「全部」，其他值表示特定状态
+      filtered = filtered.filter(r => r.rfqStatus === query.rfqStatus)
+    }
     if (query.rfqNo) {
       filtered = filtered.filter(r => (r.rfqNo || '').includes(query.rfqNo))
     }
     if (query.rfqTitle) {
       filtered = filtered.filter(r => (r.rfqTitle || '').includes(query.rfqTitle))
     }
+
+    // 排序逻辑（默认按截止交期升序）
+    const sortField = sortBy.value
+    const sortAsc = sortOrder.value === 'asc'
+    filtered = [...filtered].sort((a, b) => {
+      let aVal: string | undefined
+      let bVal: string | undefined
+      if (sortField === 'quoteDeadline') {
+        aVal = a.quoteDeadline
+        bVal = b.quoteDeadline
+      } else if (sortField === 'latestQuoteTime') {
+        aVal = a.latestQuoteTime
+        bVal = b.latestQuoteTime
+      } else if (sortField === 'createTime') {
+        aVal = a.createTime
+        bVal = b.createTime
+      }
+      if (!aVal && !bVal) return 0
+      if (!aVal) return sortAsc ? 1 : -1
+      if (!bVal) return sortAsc ? -1 : 1
+      return sortAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+    })
+
     rfqRecords.value = filtered
     // 默认全部展开并加载报价
     expandedIds.value = new Set(filtered.map(r => r.id))
@@ -63,6 +102,19 @@ const loadData = async () => {
 const resetQuery = () => {
   query.rfqNo = ''
   query.rfqTitle = ''
+  query.rfqStatus = null
+  sortBy.value = null
+  sortOrder.value = 'asc'
+  loadData()
+}
+
+const handleSort = (field: SortField) => {
+  if (sortBy.value === field) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortBy.value = field
+    sortOrder.value = 'asc'
+  }
   loadData()
 }
 
@@ -133,23 +185,23 @@ const isLowestPrice = (lineId: number | string, unitPrice: number, quoteStatus: 
   return quoteStatus === 1 && minPriceMap.value[String(lineId)] === unitPrice
 }
 
-/* ==================== 排序 ==================== */
-const sortBy = ref<'unitPrice' | 'deliveryDate' | ''>('')
-const sortOrder = ref<'asc' | 'desc'>('asc')
+/* ==================== 横向比价排序 ==================== */
+const compareSortBy = ref<'unitPrice' | 'deliveryDate' | ''>('')
+const compareSortOrder = ref<'asc' | 'desc'>('asc')
 
-const toggleSort = (key: 'unitPrice' | 'deliveryDate') => {
-  if (sortBy.value === key) {
-    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+const toggleCompareSort = (key: 'unitPrice' | 'deliveryDate') => {
+  if (compareSortBy.value === key) {
+    compareSortOrder.value = compareSortOrder.value === 'asc' ? 'desc' : 'asc'
   } else {
-    sortBy.value = key
-    sortOrder.value = 'asc'
+    compareSortBy.value = key
+    compareSortOrder.value = 'asc'
   }
 }
 
 /* ==================== 报价操作 ==================== */
 const handleAdopt = async (row: QuoteRecord) => {
   try {
-    await ElMessageBox.confirm(`确认采纳报价 ${row.quoteNo}？`, '确认采纳')
+    await ElMessageBox.confirm(`确认同意该报价吗？同意后将自动拒绝该RFQ下的其他报价。`, '确认采纳')
     await quoteApi.adopt(row.id)
     ElMessage.success('已采纳')
     delete quoteCache.value[row.rfqId]
@@ -214,11 +266,63 @@ onMounted(loadData)
             @keyup.enter="loadData"
           />
         </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="query.rfqStatus" placeholder="全部" style="width: 140px" @change="loadData">
+            <el-option label="全部" :value="-1" />
+            <el-option label="已发布" :value="1" />
+            <el-option label="报价中" :value="2" />
+            <el-option label="已关闭" :value="3" />
+            <el-option label="草稿" :value="0" />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="loadData">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
         </el-form-item>
       </el-form>
+    </div>
+
+    <!-- 排序按钮 -->
+    <div class="sort-panel">
+      <span class="sort-label">排序：</span>
+      <el-button-group>
+        <el-button
+          :type="sortBy === 'quoteDeadline' ? 'primary' : 'default'"
+          size="small"
+          @click="handleSort('quoteDeadline')"
+        >
+          截止交期
+          <el-icon v-if="sortBy === 'quoteDeadline'" class="sort-icon">
+            <svg viewBox="0 0 1024 1024" width="12" height="12" :style="{ transform: sortOrder === 'asc' ? 'rotate(180deg)' : 'none' }">
+              <path d="M512 64l384 384H128z" fill="currentColor" />
+            </svg>
+          </el-icon>
+        </el-button>
+        <el-button
+          :type="sortBy === 'latestQuoteTime' ? 'primary' : 'default'"
+          size="small"
+          @click="handleSort('latestQuoteTime')"
+        >
+          最新报价时间
+          <el-icon v-if="sortBy === 'latestQuoteTime'" class="sort-icon">
+            <svg viewBox="0 0 1024 1024" width="12" height="12" :style="{ transform: sortOrder === 'asc' ? 'rotate(180deg)' : 'none' }">
+              <path d="M512 64l384 384H128z" fill="currentColor" />
+            </svg>
+          </el-icon>
+        </el-button>
+        <el-button
+          :type="sortBy === 'createTime' ? 'primary' : 'default'"
+          size="small"
+          @click="handleSort('createTime')"
+        >
+          RFQ创建时间
+          <el-icon v-if="sortBy === 'createTime'" class="sort-icon">
+            <svg viewBox="0 0 1024 1024" width="12" height="12" :style="{ transform: sortOrder === 'asc' ? 'rotate(180deg)' : 'none' }">
+              <path d="M512 64l384 384H128z" fill="currentColor" />
+            </svg>
+          </el-icon>
+        </el-button>
+      </el-button-group>
     </div>
 
     <!-- 询价单卡片列表 -->
@@ -239,8 +343,8 @@ onMounted(loadData)
               {{ rfq.quoteCount }} 份报价
             </el-tag>
             <span v-if="rfq.currency" class="rfq-card__meta">{{ rfq.currency }}</span>
-            <span v-if="rfq.latestQuoteTime" class="rfq-card__meta">最新报价 {{ rfq.latestQuoteTime }}</span>
-            <span v-if="rfq.quoteDeadline" class="rfq-card__meta rfq-card__meta--deadline">截止 {{ rfq.quoteDeadline }}</span>
+            <span v-if="rfq.latestQuoteTime" class="rfq-card__meta">最新报价 {{ formatDateDisplay(rfq.latestQuoteTime) }}</span>
+            <span v-if="rfq.quoteDeadline" class="rfq-card__meta rfq-card__meta--deadline">截止 {{ formatDateDisplay(rfq.quoteDeadline) }}</span>
           </div>
         </div>
 
@@ -255,6 +359,9 @@ onMounted(loadData)
                 size="small"
                 class="quote-table"
               >
+                <el-table-column label="状态" width="100" align="center" fixed>
+                  <template #default="{ row: r }"><StatusTag :value="r.quoteStatus" prefix="QT" /></template>
+                </el-table-column>
                 <el-table-column prop="quoteNo" label="报价单号" width="170" />
                 <el-table-column prop="supplierName" label="供应商" min-width="160" />
                 <el-table-column prop="currency" label="币种" width="80" align="center" />
@@ -264,10 +371,9 @@ onMounted(loadData)
                 <el-table-column prop="taxAmount" label="税额" width="110" align="right">
                   <template #default="{ row: r }">{{ r.taxAmount?.toLocaleString() }}</template>
                 </el-table-column>
-                <el-table-column label="状态" width="100" align="center">
-                  <template #default="{ row: r }"><StatusTag :value="r.quoteStatus" prefix="QT" /></template>
+                <el-table-column label="提交时间" width="170">
+                  <template #default="{ row: r }">{{ formatDateDisplay(r.submitTime) }}</template>
                 </el-table-column>
-                <el-table-column prop="submitTime" label="提交时间" width="170" />
                 <el-table-column label="操作" width="280" fixed="right">
                   <template #default="{ row: r }">
                     <el-button link type="primary" @click.stop="openDetail(r)">详情</el-button>
@@ -302,19 +408,19 @@ onMounted(loadData)
               <span class="line-no">#{{ line.lineNo }}</span>
               <span class="line-mtrl">{{ line.materialCode }} - {{ line.materialName }}（{{ line.spec }}）</span>
               <span class="line-qty">数量：{{ line.quantity }}{{ line.unit }}</span>
-              <span class="line-date">要求交期：{{ line.deliveryDate || '-' }}</span>
+              <span class="line-date">要求交期：{{ formatDateDisplay(line.deliveryDate) || '-' }}</span>
             </div>
             <el-table
               :data="(compareData[line.id as number] || []).sort((a, b) => {
-                if (sortBy === 'unitPrice') return sortOrder === 'asc' ? a.quoteLine.unitPrice - b.quoteLine.unitPrice : b.quoteLine.unitPrice - a.quoteLine.unitPrice
-                if (sortBy === 'deliveryDate') return sortOrder === 'asc' ? a.quoteLine.deliveryDate.localeCompare(b.quoteLine.deliveryDate) : b.quoteLine.deliveryDate.localeCompare(a.quoteLine.deliveryDate)
+                if (compareSortBy === 'unitPrice') return compareSortOrder === 'asc' ? a.quoteLine.unitPrice - b.quoteLine.unitPrice : b.quoteLine.unitPrice - a.quoteLine.unitPrice
+                if (compareSortBy === 'deliveryDate') return compareSortOrder === 'asc' ? a.quoteLine.deliveryDate.localeCompare(b.quoteLine.deliveryDate) : b.quoteLine.deliveryDate.localeCompare(a.quoteLine.deliveryDate)
                 return 0
               })"
               border size="small"
               :empty-text="'暂无供应商报价该行'"
             >
               <el-table-column prop="supplierName" label="供应商" width="150" />
-              <el-table-column label="单价" width="130" :sortable="'custom'" @sort-change="toggleSort('unitPrice')">
+              <el-table-column label="单价" width="130" :sortable="'custom'" @sort-change="toggleCompareSort('unitPrice')">
                 <template #default="{ row: r }">
                   <span :class="{ 'lowest-price': isLowestPrice(line.id as number, r.quoteLine?.unitPrice, r.quoteStatus) }">
                     {{ r.quoteLine?.unitPrice?.toLocaleString() }}
@@ -325,8 +431,8 @@ onMounted(loadData)
               <el-table-column label="小计" width="120">
                 <template #default="{ row: r }">{{ r.quoteLine?.totalPrice?.toLocaleString() }}</template>
               </el-table-column>
-              <el-table-column label="交期" width="120" :sortable="'custom'" @sort-change="toggleSort('deliveryDate')">
-                <template #default="{ row: r }">{{ r.quoteLine?.deliveryDate || '-' }}</template>
+              <el-table-column label="交期" width="120" :sortable="'custom'" @sort-change="toggleCompareSort('deliveryDate')">
+                <template #default="{ row: r }">{{ formatDateDisplay(r.quoteLine?.deliveryDate) || '-' }}</template>
               </el-table-column>
               <el-table-column prop="quoteLine.paymentTerms" label="付款条件" width="110">
                 <template #default="{ row: r }">{{ r.quoteLine?.paymentTerms || '-' }}</template>
@@ -356,14 +462,14 @@ onMounted(loadData)
           <el-descriptions-item label="询价标题" :span="2">{{ detailRow.rfqTitle || '-' }}</el-descriptions-item>
           <el-descriptions-item label="供应商">{{ detailRow.supplierName }}</el-descriptions-item>
           <el-descriptions-item label="币种">{{ detailRow.currency }}</el-descriptions-item>
-          <el-descriptions-item label="总金额">{{ detailRow.totalAmount?.toLocaleString() }}</el-descriptions-item>
+          <el-descriptions-item label="总金额"><span class="highlight-red">{{ detailRow.totalAmount?.toLocaleString() }}</span></el-descriptions-item>
           <el-descriptions-item label="税额">{{ detailRow.taxAmount?.toLocaleString() }}</el-descriptions-item>
           <el-descriptions-item label="状态">
             <StatusTag :value="detailRow.quoteStatus" prefix="QT" />
           </el-descriptions-item>
-          <el-descriptions-item label="有效期至">{{ detailRow.validUntil || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="提交时间">{{ detailRow.submitTime || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="备注" :span="2">{{ detailRow.remark || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="有效期至"><span class="highlight-red">{{ formatDateDisplay(detailRow.validUntil) || '-' }}</span></el-descriptions-item>
+          <el-descriptions-item label="提交时间">{{ formatDateDisplay(detailRow.submitTime) || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="备注" :span="2"><span class="highlight-red">{{ detailRow.remark || '-' }}</span></el-descriptions-item>
         </el-descriptions>
         <el-divider>报价明细行</el-divider>
         <el-table v-loading="detailLoading" :data="detailLines" border size="small">
@@ -374,8 +480,11 @@ onMounted(loadData)
           <el-table-column prop="materialName" label="物料名称" min-width="130" />
           <el-table-column prop="unitPrice" label="单价" width="100" />
           <el-table-column prop="totalPrice" label="小计" width="110" />
-          <el-table-column prop="deliveryDate" label="交期" width="110" />
+          <el-table-column label="交期" width="110">
+            <template #default="{ row }">{{ formatDateDisplay(row.deliveryDate) }}</template>
+          </el-table-column>
           <el-table-column prop="paymentTerms" label="付款条件" width="100" />
+          <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
         </el-table>
       </template>
       <template #footer>
@@ -388,6 +497,25 @@ onMounted(loadData)
 <style scoped>
 .search-panel {
   margin-bottom: 16px;
+}
+
+/* ========== 排序面板 ========== */
+.sort-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.sort-label {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.sort-icon {
+  margin-left: 4px;
+  font-size: 12px;
 }
 
 /* ========== 询价单卡片列表 ========== */
@@ -545,5 +673,11 @@ onMounted(loadData)
 }
 .lowest-tag {
   margin-left: 4px;
+}
+
+/* 报价详情标红 */
+.highlight-red {
+  color: #f56c6c;
+  font-weight: 600;
 }
 </style>

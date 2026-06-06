@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,5 +34,9 @@ public class DeliveryNoticeVO {
     private LocalDate productionDate;
     private LocalDate expiryDate;
     private String remark;
+    /** 收货仓库 */
+    private String warehouse;
+    /** 发货总数量（由明细 actualQty 聚合，仅在列表场景填充） */
+    private BigDecimal quantity;
     private List<DeliveryDetailVO> details;
 }

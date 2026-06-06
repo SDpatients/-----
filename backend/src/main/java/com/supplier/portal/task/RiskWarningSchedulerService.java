@@ -7,12 +7,17 @@ import com.supplier.message.dto.MessageNoticeCreateDTO;
 import com.supplier.message.service.MessageNoticeService;
 import com.supplier.order.entity.PurchaseOrder;
 import com.supplier.order.mapper.PurchaseOrderMapper;
+import com.supplier.portal.dto.PortalTodoCreateDTO;
+import com.supplier.portal.service.PortalTodoService;
+import com.supplier.sourcing.entity.Rfq;
+import com.supplier.sourcing.mapper.RfqMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -26,6 +31,8 @@ public class RiskWarningSchedulerService {
     private final PurchaseOrderMapper purchaseOrderMapper;
     private final DeliveryNoticeMapper deliveryNoticeMapper;
     private final MessageNoticeService messageNoticeService;
+    private final PortalTodoService portalTodoService;
+    private final RfqMapper rfqMapper;
 
     /**
      * 每日 08:00 扫描逾期风险并生成预警通知
@@ -46,6 +53,9 @@ public class RiskWarningSchedulerService {
 
         // 4. 扫描逾期未完成的订单（交期已过，订单状态非完成/取消）
         noticeCount += scanOverdueOrders();
+
+        // 5. 扫描即将截止的询价单
+        noticeCount += scanApproachingRfqDeadline();
 
         log.info("[风险预警] 扫描完成，共生成 {} 条预警通知", noticeCount);
     }
@@ -137,5 +147,35 @@ public class RiskWarningSchedulerService {
         } catch (Exception e) {
             log.error("[风险预警] 发送通知失败: supplierId={}, title={}", supplierId, title, e);
         }
+    }
+
+    /**
+     * 扫描即将截止的询价单（报价截止日期在未来3天内），为采购方创建待办
+     */
+    private int scanApproachingRfqDeadline() {
+        LocalDate start = LocalDate.now();
+        LocalDate end = LocalDate.now().plusDays(3);
+        List<Rfq> rfqs = rfqMapper.selectList(
+                new LambdaQueryWrapper<Rfq>()
+                        .in(Rfq::getRfqStatus, 1, 2)
+                        .ge(Rfq::getQuoteDeadline, start)
+                        .le(Rfq::getQuoteDeadline, end)
+                        .select(Rfq::getId, Rfq::getRfqNo, Rfq::getQuoteDeadline)
+        );
+        for (Rfq rfq : rfqs) {
+            try {
+                PortalTodoCreateDTO todoDto = new PortalTodoCreateDTO();
+                todoDto.setTodoType("rfq_deadline");
+                todoDto.setBusinessType("rfq");
+                todoDto.setBusinessId(rfq.getId());
+                todoDto.setBusinessNo(rfq.getRfqNo());
+                todoDto.setTitle("询价单即将截止 " + rfq.getRfqNo());
+                todoDto.setDueTime(rfq.getQuoteDeadline() != null ? rfq.getQuoteDeadline() : LocalDateTime.now().plusDays(1));
+                portalTodoService.create(todoDto);
+            } catch (Exception e) {
+                log.error("[风险预警] 创建询价截止待办失败: rfqId={}", rfq.getId(), e);
+            }
+        }
+        return rfqs.size();
     }
 }

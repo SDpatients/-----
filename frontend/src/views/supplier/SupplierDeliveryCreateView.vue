@@ -9,6 +9,7 @@ import { orderDetailApi, type OrderDetailLineItem } from '@/api/orderDetail'
 import { getIdempotentHeaders } from '@/utils/idempotent'
 import { toOrder } from '@/api/adapters'
 import { toId } from '@/utils/id'
+import { formatDateDisplay } from '@/lib/utils'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import OrderSelector from '@/components/business/OrderSelector.vue'
@@ -67,7 +68,7 @@ const onOrderSelect = async (order: PurchaseOrder) => {
       spec: l.materialSpec || l.spec || '',
       unit: l.unit || '',
       orderQty: Number(l.quantity || 0),
-      shippedQty: Number(l.receivedQty || l.deliveredQty || 0),
+      shippedQty: Number(l.deliveredQty || 0),
       deliveryDate: l.deliveryDate || '',
       orderDetailId: toId(l.id),
     }))
@@ -109,14 +110,19 @@ const orderPickerTotal = ref(0)
 const orderPickerQuery = reactive({ pageNum: 1, pageSize: 10, keyword: '' })
 const orderPickerSelected = ref<PurchaseOrder | null>(null)
 
+// 创建发货通知时仅允许选择"已确认"或"部分发货"的采购订单
+const ALLOWED_ORDER_CONFIRM_STATUSES = ['已确认', '部分发货']
+
 const loadOrdersForPicker = async () => {
   orderPickerLoading.value = true
   try {
     const params: any = { pageNum: orderPickerQuery.pageNum, pageSize: orderPickerQuery.pageSize }
     if (orderPickerQuery.keyword) params.keyword = orderPickerQuery.keyword
     const result = await orderApi.page(params)
-    orderPickerRecords.value = result.records.map(toOrder)
-    orderPickerTotal.value = result.total
+    orderPickerRecords.value = result.records
+      .map(toOrder)
+      .filter(o => ALLOWED_ORDER_CONFIRM_STATUSES.includes(o.confirmStatus))
+    orderPickerTotal.value = orderPickerRecords.value.length
   } finally {
     orderPickerLoading.value = false
   }
@@ -182,7 +188,7 @@ const submit = async () => {
       </template>
     </el-alert>
 
-    <el-form ref="formRef" :model="form" :rules="formRules" label-width="120px" style="max-width: 760px">
+    <el-form ref="formRef" :model="form" :rules="formRules" label-width="120px">
       <el-form-item label="关联订单" prop="orderId">
         <div style="display:flex;gap:8px;width:100%">
           <OrderSelector v-model="form.orderId" @select="onOrderSelect" style="flex:1" />
@@ -207,7 +213,7 @@ const submit = async () => {
           <el-tag type="warning">{{ selectedOrder.amount }}</el-tag>
         </el-form-item>
         <el-form-item label="要求交期">
-          <el-tag type="info">{{ selectedOrder.deliveryDate }}</el-tag>
+          <el-tag type="info">{{ formatDateDisplay(selectedOrder.deliveryDate) }}</el-tag>
         </el-form-item>
       </template>
 
@@ -308,7 +314,7 @@ const submit = async () => {
     </el-form>
 
     <!-- 订单选择弹窗 -->
-    <el-dialog v-model="orderPickerVisible" title="选择关联订单" width="950px" :close-on-click-modal="false">
+    <el-dialog v-model="orderPickerVisible" title="选择关联订单" width="1100px" :close-on-click-modal="false" top="5vh">
       <div style="margin-bottom:12px">
         <el-form inline :model="orderPickerQuery" @submit.prevent="loadOrdersForPicker">
           <el-form-item label="关键词">
@@ -320,11 +326,76 @@ const submit = async () => {
           </el-form-item>
         </el-form>
       </div>
-      <el-table v-loading="orderPickerLoading" :data="orderPickerRecords" border highlight-current-row @current-change="row => orderPickerSelected = row">
+      <el-table
+        v-loading="orderPickerLoading"
+        :data="orderPickerRecords"
+        border
+        row-key="id"
+        highlight-current-row
+        @current-change="row => orderPickerSelected = row"
+      >
+        <el-table-column type="expand">
+          <template #default="{ row }">
+            <div style="padding: 8px 16px 16px 50px">
+              <div v-if="row.details && row.details.length > 0">
+                <el-table :data="row.details" border size="small" style="width: 100%">
+                  <el-table-column prop="lineNo" label="行号" width="60" />
+                  <el-table-column prop="materialCode" label="物料编码" width="130" />
+                  <el-table-column prop="materialName" label="物料名称" min-width="140" show-overflow-tooltip />
+                  <el-table-column prop="materialSpec" label="规格" width="120" show-overflow-tooltip />
+                  <el-table-column prop="unit" label="单位" width="70" />
+                  <el-table-column label="订单数量" width="100" align="right">
+                    <template #default="{ row: d }">{{ d.quantity || 0 }}</template>
+                  </el-table-column>
+                  <el-table-column label="已发数量" width="100" align="right">
+                    <template #default="{ row: d }">
+                      <span :style="{ color: (d.deliveredQty || 0) > 0 ? '#409eff' : '' }">{{ d.deliveredQty || 0 }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="已收数量" width="100" align="right">
+                    <template #default="{ row: d }">
+                      <span :style="{ color: (d.receivedQty || 0) > 0 ? '#67c23a' : '' }">{{ d.receivedQty || 0 }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="可发数量" width="100" align="right">
+                    <template #default="{ row: d }">
+                      <span :style="{ color: (d.quantity || 0) - (d.deliveredQty || 0) > 0 ? '#e6a23c' : '#f56c6c', fontWeight: 600 }">
+                        {{ (d.quantity || 0) - (d.deliveredQty || 0) }}
+                      </span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="交货日期" width="120">
+                    <template #default="{ row: d }">{{ formatDateDisplay(d.deliveryDate) }}</template>
+                  </el-table-column>
+                </el-table>
+              </div>
+              <div v-else style="color: #909399; text-align: center; padding: 12px">暂无订单明细</div>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="orderNo" label="订单号" width="160" />
         <el-table-column prop="supplierName" label="供应商" min-width="120" />
-        <el-table-column prop="amount" label="金额" width="120" />
-        <el-table-column prop="deliveryDate" label="要求交期" width="120" />
+        <el-table-column label="总量" width="80" align="right">
+          <template #default="{ row }">
+            <span style="font-weight: 600">{{ row.totalQty || 0 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="已发/已收" width="110" align="center">
+          <template #default="{ row }">
+            <span style="font-weight: 500">{{ row.shippedQty || 0 }} / {{ row.receivedQty || 0 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="在途" width="80" align="right">
+          <template #default="{ row }">
+            <span :style="{ color: (row.inTransitQty || 0) > 0 ? '#409eff' : '', fontWeight: (row.inTransitQty || 0) > 0 ? 600 : 400 }">
+              {{ row.inTransitQty || 0 }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="amount" label="金额" width="110" />
+        <el-table-column label="要求交期" width="120">
+          <template #default="{ row }">{{ formatDateDisplay(row.deliveryDate) }}</template>
+        </el-table-column>
         <el-table-column label="确认状态" width="100">
           <template #default="{ row }">
             <el-tag size="small" :type="row.confirmStatus === '已确认' ? 'success' : row.confirmStatus === '已拒单' ? 'danger' : 'info'">
@@ -332,7 +403,7 @@ const submit = async () => {
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="110"><template #default="{ row }"><StatusTag :value="row.status" /></template></el-table-column>
+        <el-table-column label="状态" width="100"><template #default="{ row }"><StatusTag :value="row.status" /></template></el-table-column>
       </el-table>
       <el-pagination
         v-model:current-page="orderPickerQuery.pageNum" v-model:page-size="orderPickerQuery.pageSize"
@@ -340,8 +411,19 @@ const submit = async () => {
         @current-change="loadOrdersForPicker"
       />
       <template #footer>
-        <el-button @click="orderPickerVisible = false">取消</el-button>
-        <el-button type="primary" :disabled="!orderPickerSelected" @click="confirmOrderPicker">确认选择</el-button>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div v-if="orderPickerSelected" style="font-size:13px;color:#606266">
+            已选择: <strong>{{ orderPickerSelected.orderNo }}</strong> — {{ orderPickerSelected.supplierName }}
+            <span v-if="orderPickerSelected.details?.length" style="margin-left:8px;color:#909399">
+              ({{ orderPickerSelected.details.length }}行物料)
+            </span>
+          </div>
+          <div v-else />
+          <div>
+            <el-button @click="orderPickerVisible = false">取消</el-button>
+            <el-button type="primary" :disabled="!orderPickerSelected" @click="confirmOrderPicker">确认选择</el-button>
+          </div>
+        </div>
       </template>
     </el-dialog>
   </PageContainer>

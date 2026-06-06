@@ -28,4 +28,8 @@ export interface ExportRequest {
   scope: 'current' | 'all' | 'selected'
   masked: boolean
   asyncMode: boolean
+  /** 页面查询条件，传递给后端导出接口 */
+  queryParams?: Record<string, unknown>
+  /** 已选中的行ID列表 */
+  selectedIds?: (number | string)[]
 }

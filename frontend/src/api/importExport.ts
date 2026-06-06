@@ -13,6 +13,13 @@ interface BackendImportCheckResult {
   errorFileId?: number
 }
 
+/** 模块名到后端导出接口路径的映射 */
+const MODULE_EXPORT_PATH: Record<string, string> = {
+  'ASN': '/v1/delivery-notices/export',
+  '采购订单': '/v1/purchase-orders/export',
+  '对账单': '/v1/reconciliation/export',
+}
+
 export const importExportApi = {
   /** 获取导入模板列表（后端暂无模板列表接口，暂时返回默认模板；后续对接 GET /v1/imports/templates） */
   templates: async (): Promise<ImportTemplate[]> => {
@@ -38,6 +45,25 @@ export const importExportApi = {
     return result
   },
   createExport: async (data: ExportRequest) => {
+    const exportPath = MODULE_EXPORT_PATH[data.module]
+    if (exportPath) {
+      // 调用模块专用导出接口（同步执行，返回 taskId 且文件已生成）
+      const taskId = await request.post<number, number>(exportPath, {
+        scope: data.scope,
+        selectedIds: data.selectedIds,
+        keyword: data.queryParams?.keyword,
+        supplierId: data.queryParams?.supplierId,
+        deliveryStatus: data.queryParams?.deliveryStatus,
+        startDate: data.queryParams?.startDate,
+        endDate: data.queryParams?.endDate,
+      })
+      // 模块专用导出是同步完成的，创建成功后立即下载
+      if (taskId) {
+        await importExportApi.downloadExport(taskId)
+      }
+      return importExportApi.tasks()
+    }
+    // 兜底：使用通用导出任务接口
     await request.post<number, number>('/v1/export-tasks', { taskType: data.module, exportParams: JSON.stringify(data), totalCount: 0 })
     return importExportApi.tasks()
   },

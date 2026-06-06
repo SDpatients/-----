@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 public class PurchaseOrderQuery {
@@ -18,6 +19,7 @@ public class PurchaseOrderQuery {
 
     private String keyword;
     private Integer orderStatus;
+    private List<Integer> excludeStatuses;
     private Long supplierId;
     private LocalDate startDate;
     private LocalDate endDate;

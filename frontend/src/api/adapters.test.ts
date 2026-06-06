@@ -29,8 +29,6 @@ describe('toSupplier', () => {
     expect(result.code).toBe('SUP-001')
     expect(result.name).toBe('测试供应商')
     expect(result.admissionStage).toBe('已准入')
-    expect(result.performanceScore).toBe(5)
-    expect(result.riskLevel).toBe('low')
   })
 
   it('should use fallback values', () => {
@@ -40,12 +38,6 @@ describe('toSupplier', () => {
     expect(result.category).toBe('-')
     expect(result.contact).toBe('-')
     expect(result.phone).toBe('-')
-  })
-
-  it('should compute risk for low-rated supplier', () => {
-    const result = toSupplier({ id: '3', rating: 2 })
-    expect(result.performanceScore).toBe(2)
-    expect(result.riskLevel).toBe('medium')
   })
 
   it('should use code/name fallbacks', () => {

@@ -53,6 +53,9 @@ a {
   margin-top: 6px;
   font-size: 13px;
   color: #6b7a90;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .search-panel {

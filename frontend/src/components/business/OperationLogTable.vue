@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
+import { formatDateDisplay } from '@/lib/utils'
 import StatusTag from './StatusTag.vue'
 import OperationLogDrawer from './OperationLogDrawer.vue'
 import { useOperationLog } from '@/composables/useOperationLog'
@@ -40,7 +41,7 @@ watch(() => [props.module, props.businessNo], loadData)
       <el-table-column label="前状态" width="110"><template #default="{ row }"><StatusTag :value="row.beforeStatus" /></template></el-table-column>
       <el-table-column label="后状态" width="110"><template #default="{ row }"><StatusTag :value="row.afterStatus" /></template></el-table-column>
       <el-table-column prop="result" label="结果" width="90" />
-      <el-table-column prop="operatedAt" label="操作时间" width="170" />
+      <el-table-column label="操作时间" width="170"><template #default="{ row }">{{ formatDateDisplay(row.operatedAt) }}</template></el-table-column>
       <el-table-column label="操作" width="100"><template #default="{ row }"><el-button link type="primary" @click="open(row)">追踪</el-button></template></el-table-column>
     </el-table>
     <OperationLogDrawer v-model="visible" :log="current" />

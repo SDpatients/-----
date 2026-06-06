@@ -1,26 +1,25 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { supplierApi } from '@/api/supplier'
 import { orderApi } from '@/api/order'
 import { orderDetailApi, type OrderDetailLineItem } from '@/api/orderDetail'
 import { orderChangeApi, type OrderChangeItem } from '@/api/orderChange'
 import { logisticsApi } from '@/api/logistics'
-import { qualityApi } from '@/api/quality'
-import { settlementApi } from '@/api/settlement'
 import { notificationApi } from '@/api/notification'
 import { qualificationApi } from '@/api/qualification'
-import { toSupplier, toOrder, toAsn, toQuality, toSettlement, toPortalTodo } from '@/api/adapters'
-import type { OrderDetailLine, DeliveryDetailLine, InspectionDetailLine, ReconDetailLine, ThreeWayMatchData, ThreeWayMatchItem } from '@/api/mockData'
+import { toSupplier, toOrder, toAsn, toPortalTodo } from '@/api/adapters'
+import type { OrderDetailLine, DeliveryDetailLine } from '@/api/mockData'
+import { formatDateDisplay } from '@/lib/utils'
 import type { Certificate } from '@/types/business'
-import PageContainer from '@/components/common/PageContainer.vue'
 import AttachmentPanel from '@/components/business/AttachmentPanel.vue'
+import PageContainer from '@/components/common/PageContainer.vue'
 import AttachmentUpload from '@/components/business/AttachmentUpload.vue'
 import AttachmentVersionList from '@/components/business/AttachmentVersionList.vue'
 import ImportExportPanel from '@/components/business/ImportExportPanel.vue'
 import OperationLogTable from '@/components/business/OperationLogTable.vue'
-import type { AsnNotice, PortalTodo, PurchaseOrder, QualityCase, Settlement, Supplier } from '@/types/business'
+import type { PortalTodo, PurchaseOrder, Settlement, Supplier } from '@/types/business'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,7 +34,7 @@ const id = computed(() => route.params.id as string)
 const fieldLabelMap: Record<string, string> = {
   // 供应商
   code: '供应商编码', name: '供应商名称', category: '品类', contact: '联系人',
-  phone: '联系电话', address: '地址', performanceScore: '绩效分', riskLevel: '风险等级',
+  phone: '联系电话', address: '地址',
   createdAt: '创建时间',
   // 订单
   orderNo: '订单号', supplierId: '供应商ID', supplierName: '供应商名称',
@@ -44,15 +43,9 @@ const fieldLabelMap: Record<string, string> = {
   // ASN / 物流
   asnNo: 'ASN号', shipDate: '发货日期', eta: '预计到货', quantity: '数量',
   warehouse: '仓库',
-  // 质量
-  caseNo: '质量单号', type: '类型', severity: '严重度', owner: '负责人',
-  createdAt: '创建时间', description: '问题描述',
-  // 对账
-  statementNo: '对账单号', period: '账期', diffAmount: '差异金额',
-  invoiceStatus: '发票状态', paymentStatus: '付款状态',
 }
 
-const supplierFieldKeys = ['code', 'name', 'category', 'contact', 'phone', 'performanceScore', 'riskLevel', 'address', 'createdAt']
+const supplierFieldKeys = ['code', 'name', 'category', 'contact', 'phone', 'address', 'createdAt']
 
 const riskLevelLabel: Record<string, string> = {
   low: '低风险', medium: '中风险', high: '高风险',
@@ -76,7 +69,6 @@ const fields = computed<[string, unknown][]>(() => {
 const todos = ref<PortalTodo[]>([])
 const businessTypeMap: Record<string, string> = {
   '供应商详情': 'supplier', '订单详情': 'purchase_order', 'ASN详情': 'delivery_notice',
-  '质量详情': 'quality_inspection', '对账详情': 'reconciliation',
 }
 
 const loadData = async () => {
@@ -92,12 +84,6 @@ const loadData = async () => {
     } else if (name === 'ASN详情') {
       const data = await logisticsApi.deliveryDetail(id.value)
       detail.value = toAsn(data) as unknown as Record<string, unknown>
-    } else if (name === '质量详情') {
-      const data = await qualityApi.detail(id.value)
-      detail.value = toQuality(data) as unknown as Record<string, unknown>
-    } else if (name === '对账详情') {
-      const data = await settlementApi.detail(id.value)
-      detail.value = toSettlement(data) as unknown as Record<string, unknown>
     }
     // 加载相关待办
     const todoData = await notificationApi.todos()
@@ -160,78 +146,10 @@ const submitSupplierEdit = async () => {
 const detailLoading = ref(false)
 const orderDetailLines = ref<OrderDetailLineItem[]>([])
 const orderChanges = ref<OrderChangeItem[]>([])
-const deliveryRecords = ref<any[]>([])
+// 关联发货记录：该订单下所有 ASN（物流单），每个 ASN 包含其发货物料明细
+const deliveryNotices = ref<Array<AsnNotice & { details: DeliveryDetailLine[] }>>([])
 const deliveryDetailLines = ref<DeliveryDetailLine[]>([])
-const inspectionDetailLines = ref<InspectionDetailLine[]>([])
-const reconDetailLines = ref<ReconDetailLine[]>([])
 const supplierCertificates = ref<Certificate[]>([])
-
-// ==================== 三单匹配数据 (6.2.1) ====================
-const threeWayLoading = ref(false)
-const threeWayData = ref<ThreeWayMatchData | null>(null)
-
-const loadThreeWayMatch = async () => {
-  threeWayLoading.value = true
-  try {
-    threeWayData.value = await settlementApi.threeWayMatch(id.value)
-  } catch {
-    // 后端不可用时使用 mock
-    const { threeWayMatchData } = await import('@/api/mockData')
-    threeWayData.value = threeWayMatchData
-  } finally {
-    threeWayLoading.value = false
-  }
-}
-
-const matchStatusTag = (status: string) => {
-  const map: Record<string, { type: string; label: string }> = {
-    matched: { type: 'success', label: '已匹配' },
-    partial: { type: 'warning', label: '部分匹配' },
-    unmatched: { type: 'danger', label: '未匹配' },
-  }
-  return map[status] || { type: 'info', label: status }
-}
-
-// ==================== 差异确认弹窗 (6.2.7) ====================
-const diffConfirmVisible = ref(false)
-const diffLines = ref<ReconDetailLine[]>([])
-const diffConfirmForm = ref<Record<number, { confirmed: boolean; reason: string }>>({})
-
-const openDiffConfirm = () => {
-  const lines = reconDetailLines.value.filter(l => l.diffAmount !== 0)
-  if (lines.length === 0) {
-    ElMessage.success('无差异明细，自动确认通过')
-    return
-  }
-  diffLines.value = lines
-  diffConfirmForm.value = {}
-  for (const line of lines) {
-    diffConfirmForm.value[line.id] = { confirmed: false, reason: '' }
-  }
-  diffConfirmVisible.value = true
-}
-
-const submitDiffConfirm = async () => {
-  const allConfirmed = Object.values(diffConfirmForm.value).every(v => v.confirmed)
-  if (!allConfirmed) {
-    ElMessage.warning('请确认所有差异项后再提交')
-    return
-  }
-  try {
-    const settlementId = id.value
-    const confirmData = diffLines.value.map(line => ({
-      lineId: line.id,
-      confirmedAmount: line.amount,
-      diffAmount: line.diffAmount,
-      remark: diffConfirmForm.value[line.id]?.reason || '',
-    }))
-    await settlementApi.confirm(settlementId, { confirmLines: confirmData })
-    ElMessage.success('差异已确认，对账单处理完成')
-    diffConfirmVisible.value = false
-    loadData()
-    loadDetailData()
-  } catch { /* 拦截器处理 */ }
-}
 
 const changeTypeMap: Record<number, string> = { 1: '数量变更', 2: '价格变更', 3: '交期变更', 4: '其他' }
 const approveStatusMap: Record<number, string> = { 0: '待审批', 1: '已通过', 2: '已驳回' }
@@ -261,7 +179,8 @@ const loadDetailData = async () => {
         orderDetailLines.value = lines
       } catch {
         // 降级使用 mock
-        const mockLines = await mockApi.getOrderDetails(bid)
+        const mockApi = await import('@/api/mockApi')
+        const mockLines = await mockApi.mockApi.getOrderDetails(bid)
         orderDetailLines.value = mockLines.map(l => ({
           orderId: bid,
           lineNo: l.lineNo,
@@ -282,23 +201,26 @@ const loadDetailData = async () => {
         const changes = await orderChangeApi.page({ pageNum: 1, pageSize: 50, orderId: bid || undefined })
         orderChanges.value = changes.records
       } catch { orderChanges.value = [] }
-      // 3.2.4 加载关联发货记录
+      // 3.2.4 加载关联发货记录：从物流订单中取该订单关联的所有 ASN，默认展开其发货物料明细
       try {
-        const details = await mockApi.getDeliveryDetails(bid)
-        deliveryRecords.value = details.map((d: any, idx: number) => ({
-          lineNo: idx + 1,
-          materialCode: d.materialCode,
-          materialName: d.materialName,
-          orderLineNo: idx + 1,
-          unit: d.unit,
-          orderQty: d.planQty,
-          shipQty: d.actualQty,
-          batchNo: d.batchNo,
-          remark: d.remark,
-        }))
-      } catch { deliveryRecords.value = [] }
+        const page = await logisticsApi.deliveryPage({ pageNum: 1, pageSize: 100, orderId: bid } as any)
+        const asnList = (page.records || []).map(toAsn)
+        // 并发拉取每个 ASN 的发货物料明细
+        const enriched = await Promise.all(
+          asnList.map(async (asn: AsnNotice) => {
+            try {
+              const details = await logisticsApi.deliveryLines(asn.id)
+              return { ...asn, details: (details || []) as DeliveryDetailLine[] }
+            } catch {
+              return { ...asn, details: [] as DeliveryDetailLine[] }
+            }
+          }),
+        )
+        deliveryNotices.value = enriched
+      } catch { deliveryNotices.value = [] }
     } else if (name === 'ASN详情') {
-      const details = await mockApi.getDeliveryDetails(bid)
+      const mockApi = await import('@/api/mockApi')
+      const details = await mockApi.mockApi.getDeliveryDetails(bid)
       deliveryDetailLines.value = details.map((d: any, idx: number) => ({
         lineNo: idx + 1,
         materialCode: d.materialCode,
@@ -310,10 +232,6 @@ const loadDetailData = async () => {
         batchNo: d.batchNo,
         remark: d.remark,
       }))
-    } else if (name === '质量详情') {
-      inspectionDetailLines.value = await mockApi.getInspectionDetails(bid)
-    } else if (name === '对账详情') {
-      reconDetailLines.value = await mockApi.getReconDetails(bid)
     }
   } finally {
     detailLoading.value = false
@@ -325,8 +243,6 @@ const activeTab = ref('detail')
 const onTabChange = (tabName: string | number) => {
   if (tabName === 'detail' && !detailLoading.value) {
     loadDetailData()
-  } else if (tabName === 'threeWayMatch' && !threeWayLoading.value && !threeWayData.value) {
-    loadThreeWayMatch()
   }
 }
 
@@ -350,7 +266,7 @@ const onTabChange = (tabName: string | number) => {
         <div class="detail-grid">
           <div v-for="[key, value] in fields" :key="key" class="detail-item">
             <div class="detail-label">{{ key }}</div>
-            <div class="detail-value">{{ value }}</div>
+            <div class="detail-value">{{ key === '创建时间' ? formatDateDisplay(value as string) : value }}</div>
           </div>
         </div>
 
@@ -376,24 +292,54 @@ const onTabChange = (tabName: string | number) => {
                   <el-table-column prop="amount" label="金额" width="120">
                     <template #default="{ row }">{{ Number(row.amount || 0).toLocaleString() }}</template>
                   </el-table-column>
-                  <el-table-column prop="deliveryDate" label="交货日期" width="120" />
+                  <el-table-column label="交货日期" width="120">
+                    <template #default="{ row }">{{ formatDateDisplay(row.deliveryDate) }}</template>
+                  </el-table-column>
                   <el-table-column prop="deliveredQty" label="已发数量" width="100" />
                   <el-table-column prop="receivedQty" label="已收数量" width="100" />
                   <el-table-column prop="remark" label="备注" min-width="120" />
                 </el-table>
 
-                <!-- 3.2.4 关联发货记录子表 -->
+                <!-- 3.2.4 关联发货记录：从物流订单取该订单下的所有 ASN，默认展开显示发货物料明细 -->
                 <h4 class="section-title" style="margin-top: 20px">关联发货记录</h4>
-                <el-table v-if="deliveryRecords.length" :data="deliveryRecords" border>
-                  <el-table-column prop="lineNo" label="行号" width="70" />
-                  <el-table-column prop="materialCode" label="物料编码" width="130" />
-                  <el-table-column prop="materialName" label="物料名称" min-width="140" />
-                  <el-table-column prop="orderLineNo" label="订单行号" width="100" />
-                  <el-table-column prop="unit" label="单位" width="70" />
-                  <el-table-column prop="orderQty" label="订单数量" width="100" />
-                  <el-table-column prop="shipQty" label="发货数量" width="100" />
-                  <el-table-column prop="batchNo" label="批次号" width="160" />
-                  <el-table-column prop="remark" label="备注" min-width="120" />
+                <el-table
+                  v-if="deliveryNotices.length"
+                  :data="deliveryNotices"
+                  border
+                  row-key="id"
+                  default-expand-all
+                >
+                  <el-table-column type="expand">
+                    <template #default="{ row }">
+                      <el-table v-if="row.details?.length" :data="row.details" border size="small" class="nested-table">
+                        <el-table-column prop="materialCode" label="物料编码" width="130" />
+                        <el-table-column prop="materialName" label="物料名称" min-width="140" />
+                        <el-table-column prop="materialSpec" label="规格型号" width="140" />
+                        <el-table-column prop="unit" label="单位" width="70" />
+                        <el-table-column prop="planQty" label="计划数量" width="100" />
+                        <el-table-column prop="actualQty" label="实际数量" width="100" />
+                        <el-table-column prop="receivedQty" label="已收数量" width="100" />
+                        <el-table-column prop="batchNo" label="批次号" width="160" />
+                        <el-table-column prop="remark" label="备注" min-width="120" />
+                      </el-table>
+                      <el-empty v-else description="该物流单暂无物料明细" :image-size="60" />
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="asnNo" label="ASN号" width="160" />
+                  <el-table-column prop="supplierName" label="供应商" min-width="140" />
+                  <el-table-column prop="shipDate" label="发货日期" width="120">
+                    <template #default="{ row }">{{ formatDateDisplay(row.shipDate) }}</template>
+                  </el-table-column>
+                  <el-table-column prop="eta" label="预计到货" width="120">
+                    <template #default="{ row }">{{ formatDateDisplay(row.eta) }}</template>
+                  </el-table-column>
+                  <el-table-column prop="status" label="状态" width="100">
+                    <template #default="{ row }">
+                      <el-tag size="small">{{ row.status }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="quantity" label="发货数量" width="100" />
+                  <el-table-column prop="warehouse" label="收货仓库" min-width="140" />
                 </el-table>
                 <el-empty v-else description="暂无关联发货记录" />
 
@@ -414,8 +360,12 @@ const onTabChange = (tabName: string | number) => {
                       </el-tag>
                     </template>
                   </el-table-column>
-                  <el-table-column prop="applyTime" label="申请时间" width="160" />
-                  <el-table-column prop="approveTime" label="审批时间" width="160" />
+                  <el-table-column label="申请时间" width="160">
+                    <template #default="{ row }">{{ formatDateDisplay(row.applyTime) }}</template>
+                  </el-table-column>
+                  <el-table-column label="审批时间" width="160">
+                    <template #default="{ row }">{{ formatDateDisplay(row.approveTime) }}</template>
+                  </el-table-column>
                 </el-table>
                 <el-empty v-else description="暂无变更记录" />
               </template>
@@ -435,58 +385,14 @@ const onTabChange = (tabName: string | number) => {
                 </el-table>
               </template>
 
-              <!-- 质量检验明细 -->
-              <template v-else-if="moduleName === '质量详情'">
-                <el-table :data="inspectionDetailLines" border>
-                  <el-table-column prop="lineNo" label="序号" width="70" />
-                  <el-table-column prop="checkItem" label="检验项目" width="140" />
-                  <el-table-column prop="standard" label="标准值/范围" min-width="180" />
-                  <el-table-column prop="measuredValue" label="实测值" min-width="180" />
-                  <el-table-column prop="result" label="判定结果" width="160">
-                    <template #default="{ row }">
-                      <el-tag :type="row.result.includes('不合格') ? 'danger' : 'success'" size="small">
-                        {{ row.result }}
-                      </el-tag>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="inspector" label="检验员" width="100" />
-                  <el-table-column prop="inspectDate" label="检验日期" width="120" />
-                </el-table>
-              </template>
-
-              <!-- 对账明细 -->
-              <template v-else-if="moduleName === '对账详情'">
-                <div style="margin-bottom: 12px;">
-                  <el-button type="warning" size="small" @click="openDiffConfirm" v-if="reconDetailLines.some(l => l.diffAmount !== 0)">
-                    确认差异项
-                  </el-button>
-                </div>
-                <el-table :data="reconDetailLines" border>
-                  <el-table-column prop="lineNo" label="序号" width="70" />
-                  <el-table-column prop="businessType" label="业务类型" width="120" />
-                  <el-table-column prop="businessNo" label="业务单号" width="170" />
-                  <el-table-column prop="occurDate" label="发生日期" width="120" />
-                  <el-table-column prop="amount" label="金额" width="120">
-                    <template #default="{ row }">{{ row.amount.toLocaleString() }}</template>
-                  </el-table-column>
-                  <el-table-column prop="confirmedAmount" label="确认金额" width="120">
-                    <template #default="{ row }">{{ row.confirmedAmount.toLocaleString() }}</template>
-                  </el-table-column>
-                  <el-table-column prop="diffAmount" label="差异金额" width="120">
-                    <template #default="{ row }">
-                      <span :style="{ color: row.diffAmount !== 0 ? '#f56c6c' : '' }">{{ row.diffAmount.toLocaleString() }}</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="diffReason" label="差异原因" min-width="180" />
-                </el-table>
-              </template>
-
               <!-- 供应商资质证书 -->
               <template v-else-if="moduleName === '供应商详情'">
                 <el-table :data="supplierCertificates" border>
                   <el-table-column prop="name" label="资质名称" min-width="220" />
                   <el-table-column prop="certNo" label="证书编号" width="180" />
-                  <el-table-column prop="expireDate" label="有效期至" width="140" />
+                  <el-table-column label="有效期至" width="140">
+                    <template #default="{ row }">{{ formatDateDisplay(row.expireDate) }}</template>
+                  </el-table-column>
                   <el-table-column prop="status" label="状态" width="120">
                     <template #default="{ row }">
                       <el-tag :type="row.status === 'active' ? 'success' : 'warning'" size="small">
@@ -497,82 +403,7 @@ const onTabChange = (tabName: string | number) => {
                 </el-table>
               </template>
 
-              <el-empty v-if="!detailLoading && !orderDetailLines.length && !deliveryDetailLines.length && !inspectionDetailLines.length && !reconDetailLines.length && !supplierCertificates.length" description="暂无明细数据" />
-            </div>
-          </el-tab-pane>
-          <!-- 三单匹配 Tab (6.2.1) -- 仅对账详情显示 -->
-          <el-tab-pane v-if="moduleName === '对账详情'" label="三单匹配" name="threeWayMatch">
-            <div v-loading="threeWayLoading">
-              <template v-if="threeWayData">
-                <!-- 统计卡片 -->
-                <div class="match-summary-row">
-                  <div class="match-summary-card">
-                    <div class="match-summary-label">订单总金额</div>
-                    <div class="match-summary-value">&yen; {{ threeWayData.summary.totalOrderAmount.toLocaleString() }}</div>
-                  </div>
-                  <div class="match-summary-card">
-                    <div class="match-summary-label">收货总金额</div>
-                    <div class="match-summary-value">&yen; {{ threeWayData.summary.totalReceivedAmount.toLocaleString() }}</div>
-                  </div>
-                  <div class="match-summary-card">
-                    <div class="match-summary-label">发票总金额</div>
-                    <div class="match-summary-value">&yen; {{ threeWayData.summary.totalInvoicedAmount.toLocaleString() }}</div>
-                  </div>
-                  <div class="match-summary-card match-stat">
-                    <div><el-tag type="success" size="small">已匹配 {{ threeWayData.summary.matchedCount }}</el-tag></div>
-                    <div><el-tag type="warning" size="small">部分匹配 {{ threeWayData.summary.partialCount }}</el-tag></div>
-                    <div><el-tag type="danger" size="small">未匹配 {{ threeWayData.summary.unmatchedCount }}</el-tag></div>
-                  </div>
-                </div>
-
-                <!-- 三单对比表格 -->
-                <el-table :data="threeWayData.items" border class="three-way-table">
-                  <el-table-column prop="lineNo" label="行号" width="70" />
-                  <el-table-column prop="materialCode" label="物料编码" width="130" />
-                  <el-table-column prop="materialName" label="物料名称" min-width="140" />
-                  <el-table-column prop="unit" label="单位" width="70" />
-                  <el-table-column label="订单数量" width="100">
-                    <template #default="{ row }">{{ row.orderQty.toLocaleString() }}</template>
-                  </el-table-column>
-                  <el-table-column label="订单金额" width="120">
-                    <template #default="{ row }">&yen; {{ row.orderAmount.toLocaleString() }}</template>
-                  </el-table-column>
-                  <el-table-column label="收货数量" width="100">
-                    <template #default="{ row }">
-                      <span :style="{ color: row.receivedQty !== row.orderQty ? '#f56c6c' : '' }">{{ row.receivedQty.toLocaleString() }}</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="收货金额" width="120">
-                    <template #default="{ row }">
-                      <span :style="{ color: row.receivedAmount !== row.orderAmount ? '#f56c6c' : '' }">&yen; {{ row.receivedAmount.toLocaleString() }}</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="发票数量" width="100">
-                    <template #default="{ row }">
-                      <span :style="{ color: row.invoicedQty !== row.orderQty ? '#e6a23c' : '' }">{{ row.invoicedQty.toLocaleString() }}</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="发票金额" width="120">
-                    <template #default="{ row }">
-                      <span :style="{ color: row.invoicedAmount !== row.orderAmount ? '#e6a23c' : '' }">&yen; {{ row.invoicedAmount.toLocaleString() }}</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="匹配状态" width="110">
-                    <template #default="{ row }">
-                      <el-tag :type="matchStatusTag(row.matchStatus).type" size="small">
-                        {{ matchStatusTag(row.matchStatus).label }}
-                      </el-tag>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="diffDescription" label="差异说明" min-width="180">
-                    <template #default="{ row }">
-                      <span v-if="row.diffDescription" style="color:#e6a23c">{{ row.diffDescription }}</span>
-                      <span v-else style="color:#67c23a">-</span>
-                    </template>
-                  </el-table-column>
-                </el-table>
-              </template>
-              <el-empty v-if="!threeWayLoading && !threeWayData" description="暂无三单匹配数据" />
+              <el-empty v-if="!detailLoading && !orderDetailLines.length && !deliveryDetailLines.length && !supplierCertificates.length" description="暂无明细数据" />
             </div>
           </el-tab-pane>
           <el-tab-pane label="附件">
@@ -591,36 +422,6 @@ const onTabChange = (tabName: string | number) => {
         </el-tabs>
       </template>
     </div>
-
-    <!-- 差异确认弹窗 (6.2.7) -->
-    <el-dialog v-model="diffConfirmVisible" title="差异确认" width="700px" :close-on-click-modal="false">
-      <el-alert title="以下明细存在金额差异，请逐项确认" type="warning" :closable="false" show-icon style="margin-bottom: 16px;" />
-      <el-table :data="diffLines" border>
-        <el-table-column prop="lineNo" label="序号" width="60" />
-        <el-table-column prop="businessNo" label="业务单号" width="170" />
-        <el-table-column prop="amount" label="金额" width="100" />
-        <el-table-column prop="confirmedAmount" label="确认金额" width="100" />
-        <el-table-column prop="diffAmount" label="差异" width="80">
-          <template #default="{ row }">
-            <span style="color: #f56c6c;">{{ row.diffAmount }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="确认" width="80">
-          <template #default="{ row }">
-            <el-checkbox v-model="diffConfirmForm[row.id].confirmed" />
-          </template>
-        </el-table-column>
-        <el-table-column label="原因" min-width="150">
-          <template #default="{ row }">
-            <el-input v-model="diffConfirmForm[row.id].reason" size="small" placeholder="差异原因" />
-          </template>
-        </el-table-column>
-      </el-table>
-      <template #footer>
-        <el-button @click="diffConfirmVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitDiffConfirm">全部确认</el-button>
-      </template>
-    </el-dialog>
 
     <!-- 供应商编辑弹窗 -->
     <el-dialog v-model="showSupplierEditDialog" title="编辑供应商" width="620px" :close-on-click-modal="false">
@@ -699,82 +500,8 @@ const onTabChange = (tabName: string | number) => {
   padding-left: 8px;
   border-left: 3px solid #409eff;
 }
-.match-summary {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px;
-  background: #f8fbff;
-  border-radius: 8px;
-}
-.match-info {
-  font-size: 13px;
-  color: #606266;
-}
-
-/* 三单匹配统计卡片 (6.2.1) */
-.match-summary-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.match-summary-card {
-  padding: 14px;
-  background: #f8fbff;
-  border: 1px solid #e4ebf3;
-  border-radius: 10px;
-  text-align: center;
-}
-.match-stat {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: center;
-  align-items: center;
-}
-.match-summary-label {
-  font-size: 12px;
-  color: #718096;
-  margin-bottom: 6px;
-}
-.match-summary-value {
-  font-size: 16px;
-  font-weight: 700;
-  color: #2c3e50;
-}
-.three-way-table {
-  margin-top: 8px;
-}
-
-/* 差异确认弹窗 (6.2.7) */
-.mb-4 { margin-bottom: 16px; }
-.diff-confirm-item {
-  margin-bottom: 16px;
-  padding: 12px;
+.nested-table {
+  margin: 4px 24px 4px 8px;
   background: #fafbfc;
-  border: 1px solid #edf0f4;
-  border-radius: 8px;
-}
-.diff-actions-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 10px;
-}
-
-/* 供应商审核轨迹 */
-.audit-timeline {
-  padding: 16px 24px;
-  background: #fafbfc;
-  border-radius: 12px;
-}
-.audit-step-desc {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  font-size: 13px;
-  color: #606266;
-  margin-top: 4px;
 }
 </style>

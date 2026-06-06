@@ -1,13 +1,11 @@
 import type { PageQuery, PageResult } from '@/types/business'
-import { asnNotices, attachments, currentUser, importExportTasks, operationLogs, orders, permissions, portalTodos, qualityCases, settlements, supplierPermissions, suppliers, supplierUser, timeline } from './mockData'
+import { asnNotices, attachments, currentUser, importExportTasks, operationLogs, orders, permissions, portalTodos, supplierPermissions, suppliers, supplierUser, timeline } from './mockData'
 import { logisticsApi } from './logistics'
 import { orderApi } from './order'
 import { orderDetailApi } from './orderDetail'
-import { qualityApi } from './quality'
 import { qualificationApi } from './qualification'
-import { settlementApi } from './settlement'
 import { supplierApi } from './supplier'
-import { toAsn, toOrder, toQuality, toSettlement, toSupplier } from './adapters'
+import { toAsn, toOrder, toSupplier } from './adapters'
 import { asPage } from '@/utils/apiNormalize'
 
 const wait = <T>(data: T) => new Promise<T>((resolve) => window.setTimeout(() => resolve(data), 180))
@@ -42,21 +40,9 @@ export const mockApi = {
     const normalized = asPage<unknown>(result, query.pageNum, query.pageSize)
     return { ...normalized, records: normalized.records.map(toAsn) }
   },
-  getQualityPage: async (query: PageQuery) => {
-    const result = await qualityApi.page(query)
-    const normalized = asPage<unknown>(result, query.pageNum, query.pageSize)
-    return { ...normalized, records: normalized.records.map(toQuality) }
-  },
-  getSettlementPage: async (query: PageQuery) => {
-    const result = await settlementApi.page(query)
-    const normalized = asPage<unknown>(result, query.pageNum, query.pageSize)
-    return { ...normalized, records: normalized.records.map(toSettlement) }
-  },
   getSupplier: async (id: number | string) => toSupplier(await supplierApi.detail(id)),
   getOrder: async (id: number | string) => toOrder(await orderApi.detail(id)),
   getAsn: async (id: number | string) => toAsn(await logisticsApi.deliveryDetail(id)),
-  getQuality: async (id: number | string) => toQuality(await qualityApi.detail(id)),
-  getSettlement: async (id: number | string) => toSettlement(await settlementApi.detail(id)),
   getTimeline: () => wait(timeline),
   getPortalTodos: () => wait(portalTodos),
   getAttachments: () => wait(attachments),
@@ -86,20 +72,6 @@ export const mockApi = {
   getDeliveryDetails: async (deliveryId: number | string) => {
     try {
       return await logisticsApi.deliveryLines(deliveryId)
-    } catch {
-      return []
-    }
-  },
-  getInspectionDetails: async (inspectionId: number | string) => {
-    try {
-      return await qualityApi.lines(inspectionId)
-    } catch {
-      return []
-    }
-  },
-  getReconDetails: async (reconId: number | string) => {
-    try {
-      return await settlementApi.lines(reconId)
     } catch {
       return []
     }

@@ -31,10 +31,13 @@ import com.supplier.security.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -62,6 +65,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         LambdaQueryWrapper<PurchaseOrder> wrapper = new LambdaQueryWrapper<PurchaseOrder>()
                 .eq(supplierId != null, PurchaseOrder::getSupplierId, supplierId)
                 .eq(query.getOrderStatus() != null, PurchaseOrder::getOrderStatus, query.getOrderStatus())
+                .notIn(!CollectionUtils.isEmpty(query.getExcludeStatuses()), PurchaseOrder::getOrderStatus, query.getExcludeStatuses())
                 .ge(query.getStartDate() != null, PurchaseOrder::getOrderDate, query.getStartDate())
                 .le(query.getEndDate() != null, PurchaseOrder::getOrderDate, query.getEndDate())
                 .and(StringUtils.hasText(query.getKeyword()), w -> w
@@ -71,13 +75,30 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                 .orderByDesc(PurchaseOrder::getOrderDate)
                 .orderByDesc(PurchaseOrder::getCreateTime);
         Page<PurchaseOrder> page = purchaseOrderMapper.selectPage(new Page<>(query.getPageNum(), query.getPageSize()), wrapper);
-        return PageResult.of(page.convert(PurchaseOrderConverter::toVO));
+
+        // 为每个订单填充聚合数量
+        List<PurchaseOrderVO> voList = new ArrayList<>();
+        for (PurchaseOrder order : page.getRecords()) {
+            List<PurchaseOrderDetail> details = detailMapper.selectList(
+                    new LambdaQueryWrapper<PurchaseOrderDetail>()
+                            .eq(PurchaseOrderDetail::getOrderId, order.getId())
+                            .orderByAsc(PurchaseOrderDetail::getLineNo));
+            voList.add(PurchaseOrderConverter.toVOWithDetails(order, details));
+        }
+
+        Page<PurchaseOrderVO> voPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+        voPage.setRecords(voList);
+        return PageResult.of(voPage);
     }
 
     @Override
     public PurchaseOrderVO getDetail(Long id) {
         PurchaseOrder order = getOrderWithDataScope(id);
-        return PurchaseOrderConverter.toVO(order);
+        List<PurchaseOrderDetail> details = detailMapper.selectList(
+                new LambdaQueryWrapper<PurchaseOrderDetail>()
+                        .eq(PurchaseOrderDetail::getOrderId, id)
+                        .orderByAsc(PurchaseOrderDetail::getLineNo));
+        return PurchaseOrderConverter.toVOWithDetails(order, details);
     }
 
     @Override
@@ -134,6 +155,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         order.setConfirmTime(LocalDateTime.now());
         purchaseOrderMapper.updateById(order);
         writeTrack(order, STATUS_CONFIRMED, StringUtils.hasText(dto.getRemark()) ? dto.getRemark() : "供应商确认订单");
+        // 订单确认后自动完成关联待办
+        portalTodoService.autoFinishByBusiness("purchase_order", order.getId());
         domainEventPublisher.publish("supplier.order", "order.purchase.confirmed",
                 DomainEvent.builder()
                         .eventType("order.purchase.confirmed")
@@ -149,7 +172,9 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         dto = normalizeAction(dto);
         changeStatus(id, STATUS_PENDING_CONFIRM, STATUS_REJECTED, dto, "供应商拒单");
         PurchaseOrder order = purchaseOrderMapper.selectById(id);
+        // 订单拒单后也自动完成关联待办
         if (order != null) {
+            portalTodoService.autoFinishByBusiness("purchase_order", order.getId());
             domainEventPublisher.publish("supplier.order", "order.purchase.rejected",
                     DomainEvent.builder()
                             .eventType("order.purchase.rejected")

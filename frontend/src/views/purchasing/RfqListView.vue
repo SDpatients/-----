@@ -9,6 +9,7 @@ import { materialApi } from '@/api/material'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import ExportDialog from '@/components/business/ExportDialog.vue'
+import { formatDateDisplay } from '@/lib/utils'
 import type { RfqRecord, RfqLineItem } from '@/types/business'
 import type { Supplier } from '@/types/business'
 
@@ -378,11 +379,15 @@ onMounted(loadData)
       <el-table-column prop="rfqNo" label="询价单号" width="170" />
       <el-table-column prop="rfqTitle" label="标题" min-width="220" show-overflow-tooltip />
       <el-table-column prop="currency" label="币种" width="80" />
-      <el-table-column prop="quoteDeadline" label="报价截止时间" width="170" />
+      <el-table-column label="报价截止时间" width="170">
+        <template #default="{ row }">{{ formatDateDisplay(row.quoteDeadline) }}</template>
+      </el-table-column>
       <el-table-column label="状态" width="100">
         <template #default="{ row }"><StatusTag :value="row.rfqStatus" prefix="RFQ" /></template>
       </el-table-column>
-      <el-table-column prop="publishTime" label="发布时间" width="170" />
+      <el-table-column label="发布时间" width="170">
+        <template #default="{ row }">{{ formatDateDisplay(row.publishTime) }}</template>
+      </el-table-column>
       <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="showDetail(row)">详情</el-button>
@@ -542,7 +547,6 @@ onMounted(loadData)
         <el-table-column prop="code" label="供应商编码" width="140" />
         <el-table-column prop="name" label="供应商名称" min-width="180" show-overflow-tooltip />
         <el-table-column prop="category" label="类别" width="120" />
-        <el-table-column prop="level" label="等级" width="100" />
         <el-table-column prop="contact" label="联系人" width="100" />
         <el-table-column prop="phone" label="电话" width="130" />
       </el-table>

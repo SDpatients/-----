@@ -14,6 +14,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -68,6 +69,14 @@ public class SysUserController {
     public Result<Void> toggleStatus(@PathVariable @NotNull(message = "账号ID不能为空") Long id,
                                      @NotNull(message = "状态不能为空") @RequestParam Integer status) {
         sysUserService.toggleStatus(id, status);
+        return Result.success();
+    }
+
+    @Operation(summary = "删除供应商账号")
+    @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Void> delete(@PathVariable @NotNull(message = "账号ID不能为空") Long id) {
+        sysUserService.delete(id);
         return Result.success();
     }
 }

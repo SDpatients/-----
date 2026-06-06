@@ -10,6 +10,7 @@ import {
   supplierQualifications, rfqRecords, quoteRecords, quoteLineItems,
   integrationEndpoints, integrationLogs, syncTasks, materials,
   supplierAccounts, sysDicts, dictItems,
+  financialReconciliationRecords, financialReconciliationOverview, financialReconciliationChartData,
 } from './mockData'
 import { idEquals } from '@/utils/id'
 
@@ -103,10 +104,9 @@ on('GET', '/auth/info', async (config) => mockResponse(config, { ...currentUser,
 // ===================== Dashboard =====================
 on('GET', '/v1/dashboard/metrics', async (config) =>
   mockResponse(config, [
-    { name: '供应商总数', value: 4, unit: '家' },
-    { name: '待处理订单', value: 12, unit: '笔' },
-    { name: '本月质检批次', value: 36, unit: '批' },
-    { name: '待对账金额', value: 286000, unit: '元' },
+    { name: '进行中的询价单', value: 8, unit: '单', trend: '来自业务聚合数据' },
+    { name: '收到的未处理报价', value: 5, unit: '单', trend: '实时刷新' },
+    { name: '未送达的物流', value: 12, unit: '单', trend: '实时刷新' },
   ]),
 )
 on('GET', '/v1/dashboard/trends', async (config) =>
@@ -119,10 +119,10 @@ on('GET', '/v1/dashboard/trends', async (config) =>
 )
 on('GET', '/v1/dashboard/risks', async (config) =>
   mockResponse(config, [
-    { riskType: 'order_pending', title: '2 笔订单超 3 天未确认', count: 2, level: 'warning' },
-    { riskType: 'delivery_delay', title: '1 笔 ASN 预计延迟到货', count: 1, level: 'danger' },
-    { riskType: 'quality_issue', title: '3 条质检异常待处理', count: 3, level: 'warning' },
-    { riskType: 'recon_dispute', title: '1 笔对账差异未解决', count: 1, level: 'info' },
+    { riskType: 'order_pending', title: '未确认订单量', count: 3, level: 'warning' },
+    { riskType: 'delivery_delay', title: '计划送货已逾期', count: 1, level: 'danger' },
+    { riskType: 'delivery_approaching', title: '即将到期待发货', count: 2, level: 'warning' },
+    { riskType: 'order_overdue', title: '订单交期已逾期', count: 0, level: 'danger' },
   ]),
 )
 on('GET', '/v1/dashboard/supplier-performance', async (config) =>
@@ -625,6 +625,67 @@ on('DELETE', '/v1/dict/items/:id', async (config, params) => {
   for (const code of Object.keys(dictItems)) {
     const idx = dictItems[code].findIndex((i: any) => idEquals(i.id, params.id))
     if (idx > -1) { dictItems[code].splice(idx, 1); break }
+  }
+  return mockResponse(config, null)
+})
+
+// ===================== Financial Reconciliation =====================
+on('GET', '/v1/financial-reconciliation/overview', async (config) =>
+  mockResponse(config, financialReconciliationOverview),
+)
+on('GET', '/v1/financial-reconciliation/chart-data', async (config) =>
+  mockResponse(config, financialReconciliationChartData),
+)
+on('GET', '/v1/financial-reconciliation/list', async (config) => {
+  let filtered = [...financialReconciliationRecords]
+  const keyword = (config.params?.keyword as string)?.trim().toLowerCase()
+  const status = config.params?.status as string | undefined
+  const paymentStatus = config.params?.paymentStatus as string | undefined
+  const supplierName = config.params?.supplierName as string | undefined
+  const startDate = config.params?.startDate as string | undefined
+  const endDate = config.params?.endDate as string | undefined
+  if (keyword) {
+    filtered = filtered.filter((item) =>
+      Object.values(item).join(' ').toLowerCase().includes(keyword),
+    )
+  }
+  if (status && status !== 'all') {
+    filtered = filtered.filter((item) => String(item.reconciliationStatus) === status)
+  }
+  if (paymentStatus && paymentStatus !== 'all') {
+    filtered = filtered.filter((item) => String(item.paymentStatus) === paymentStatus)
+  }
+  if (supplierName) {
+    filtered = filtered.filter((item) => item.supplierName.includes(supplierName))
+  }
+  if (startDate) {
+    filtered = filtered.filter((item) => item.createDate >= startDate)
+  }
+  if (endDate) {
+    filtered = filtered.filter((item) => item.createDate <= endDate)
+  }
+  const result = paginate(filtered as any, config.params)
+  return mockResponse(config, result)
+})
+on('PUT', '/v1/financial-reconciliation/:id/status', async (config) =>
+  mockResponse(config, null),
+)
+on('PUT', '/v1/financial-reconciliation/:id/reconciliation-status', async (config, params) => {
+  const record = financialReconciliationRecords.find((r) => idEquals(r.id, params.id))
+  if (record) {
+    const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : (config.data || {})
+    record.reconciliationStatus = body.reconciliationStatus ?? record.reconciliationStatus
+    record.reconciliationStatusLabel = { 0: '待对账', 1: '对账中', 2: '已对账', 3: '有差异' }[record.reconciliationStatus] || '未知'
+    if (body.diffAmount) record.diffAmount = body.diffAmount
+  }
+  return mockResponse(config, null)
+})
+on('PUT', '/v1/financial-reconciliation/:id/payment-status', async (config, params) => {
+  const record = financialReconciliationRecords.find((r) => idEquals(r.id, params.id))
+  if (record) {
+    const body = typeof config.data === 'string' ? JSON.parse(config.data || '{}') : (config.data || {})
+    record.paymentStatus = body.paymentStatus ?? record.paymentStatus
+    record.paymentStatusLabel = { 0: '未付款', 1: '部分付款', 2: '已付款' }[record.paymentStatus] || '未知'
   }
   return mockResponse(config, null)
 })

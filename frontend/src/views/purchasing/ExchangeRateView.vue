@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { exchangeRateApi } from '@/api/sourcing'
+import { formatDateDisplay } from '@/lib/utils'
 import PageContainer from '@/components/common/PageContainer.vue'
 import type { ExchangeRate } from '@/types/business'
 
@@ -123,8 +124,12 @@ onMounted(loadData)
       <el-table-column prop="rate" label="汇率" width="150">
         <template #default="{ row }">{{ row.rate?.toFixed(6) }}</template>
       </el-table-column>
-      <el-table-column prop="effectiveDate" label="生效日期" width="150" />
-      <el-table-column prop="updateTime" label="更新时间" width="170" />
+      <el-table-column label="生效日期" width="150">
+        <template #default="{ row }">{{ formatDateDisplay(row.effectiveDate) }}</template>
+      </el-table-column>
+      <el-table-column label="更新时间" width="170">
+        <template #default="{ row }">{{ formatDateDisplay(row.updateTime) }}</template>
+      </el-table-column>
       <el-table-column label="操作" width="150" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>

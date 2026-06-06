@@ -54,6 +54,31 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
         return Files.readAllBytes(Path.of(root, attachment.getObjectKey()));
     }
 
+    @Override
+    public SysFileAttachment storeBytes(byte[] bytes, String fileName, String contentType, String businessType, Long businessId, String businessNo) throws IOException {
+        String ext = fileName.contains(".") ? fileName.substring(fileName.lastIndexOf('.') + 1) : "";
+        LocalDate date = LocalDate.now();
+        String objectKey = businessType + "/" + date.getYear() + "/" + String.format("%02d", date.getMonthValue()) + "/" + String.format("%02d", date.getDayOfMonth()) + "/" + (businessNo == null ? "general" : businessNo) + "/" + UUID.randomUUID() + (ext.isBlank() ? "" : "." + ext);
+        Path target = Path.of(root, objectKey);
+        Files.createDirectories(target.getParent());
+        Files.write(target, bytes);
+        SysFileAttachment attachment = new SysFileAttachment();
+        attachment.setBusinessType(businessType);
+        attachment.setBusinessId(businessId);
+        attachment.setBusinessNo(businessNo);
+        attachment.setFileName(fileName);
+        attachment.setFileExt(ext);
+        attachment.setFileSize((long) bytes.length);
+        attachment.setContentType(contentType);
+        attachment.setBucketName("local");
+        attachment.setObjectKey(objectKey.replace("\\", "/"));
+        attachment.setFileHash(sha256(bytes));
+        attachment.setUploadUserId(SecurityUtils.getUserId());
+        attachment.setUploadTime(LocalDateTime.now());
+        attachment.setStatus(1);
+        return attachment;
+    }
+
     private String sha256(byte[] bytes) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));

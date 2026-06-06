@@ -17,4 +17,6 @@ public interface SysUserService {
     void resetPassword(Long id, SysUserPasswordDTO dto);
 
     void toggleStatus(Long id, Integer status);
+
+    void delete(Long id);
 }

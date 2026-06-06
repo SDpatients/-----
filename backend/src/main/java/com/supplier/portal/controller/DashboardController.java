@@ -5,7 +5,6 @@ import com.supplier.portal.service.DashboardService;
 import com.supplier.portal.vo.DashboardMetricVO;
 import com.supplier.portal.vo.DashboardRiskVO;
 import com.supplier.portal.vo.DashboardTrendVO;
-import com.supplier.portal.vo.SupplierPerformanceVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,8 +30,4 @@ public class DashboardController {
     @GetMapping("/risks")
     @PreAuthorize("isAuthenticated()")
     public Result<List<DashboardRiskVO>> risks() { return Result.success(service.risks()); }
-
-    @GetMapping("/supplier-performance")
-    @PreAuthorize("isAuthenticated()")
-    public Result<List<SupplierPerformanceVO>> supplierPerformance() { return Result.success(service.supplierPerformance()); }
 }

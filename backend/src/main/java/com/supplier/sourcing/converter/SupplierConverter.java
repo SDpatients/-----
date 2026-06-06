@@ -23,7 +23,6 @@ public class SupplierConverter {
         entity.setAddress(dto.getAddress());
         entity.setRemark(dto.getRemark());
         entity.setStatus(SupplierStatusEnum.APPROVED.getCode());
-        entity.setRating(0);
         return entity;
     }
 
@@ -70,7 +69,6 @@ public class SupplierConverter {
         vo.setBankName(entity.getBankName());
         vo.setBankAccount(entity.getBankAccount());
         vo.setTaxNumber(entity.getTaxNumber());
-        vo.setRating(entity.getRating());
         vo.setStatus(entity.getStatus());
         vo.setAuditTime(entity.getAuditTime());
         vo.setAuditBy(entity.getAuditBy());

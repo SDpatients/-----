@@ -136,27 +136,6 @@ function generateBarcode(index: number) {
         <template #default="{ row }">{{ row.lineNo }}</template>
       </el-table-column>
 
-      <el-table-column label="关联订单行" width="140">
-        <template #default="{ row, $index }">
-          <el-select
-            v-if="!readonly && orderLines.length > 0"
-            :model-value="row.orderLineNo"
-            placeholder="选择订单行"
-            size="small"
-            style="width: 100%"
-            @change="(val: number) => onOrderLineSelect($index, val)"
-          >
-            <el-option
-              v-for="ol in orderLines"
-              :key="ol.lineNo"
-              :label="`行${ol.lineNo} ${ol.materialName}`"
-              :value="ol.lineNo"
-            />
-          </el-select>
-          <span v-else>{{ row.orderLineNo || '-' }}</span>
-        </template>
-      </el-table-column>
-
       <el-table-column label="物料编码" width="130">
         <template #default="{ row }">
           <el-input
@@ -241,28 +220,6 @@ function generateBarcode(index: number) {
             style="width: 100%"
           />
           <span v-else>{{ row.qtyPerCase || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="条码" width="220">
-        <template #default="{ row, $index }">
-          <div class="barcode-cell">
-            <template v-if="!readonly">
-              <el-input
-                v-model="row.barcode"
-                size="small"
-                placeholder="自动生成或手动输入"
-              />
-              <el-button link type="primary" size="small" @click="generateBarcode($index)">生成</el-button>
-            </template>
-            <template v-else>
-              <div v-if="row.barcode" class="barcode-svg">
-                <svg :id="`barcode-${$index}`" class="barcode-img" />
-                <span class="barcode-text">{{ row.barcode }}</span>
-              </div>
-              <span v-else>-</span>
-            </template>
-          </div>
         </template>
       </el-table-column>
 

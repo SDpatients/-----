@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { sourcingApi, bargainApi } from '@/api/sourcing'
 import { useUserStore } from '@/stores/user'
+import { formatDateDisplay } from '@/lib/utils'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import type { RfqRecord, QuoteRecord, RfqLineItem, QuoteLineItem, BargainRecord } from '@/types/business'
@@ -647,8 +648,8 @@ const loadBargainRecordsInView = async () => {
 const canResubmitFromBargain = computed(() => {
   if (!bargainQuoteRecord.value) return false
   const quote = bargainQuoteRecord.value
-  // 报价状态为草稿(0)或未采纳(3)时可以重新报价
-  if (quote.quoteStatus !== 0 && quote.quoteStatus !== 3) return false
+  // 报价状态为草稿(0)、未采纳(3)或议价中(6)时可以重新报价
+  if (quote.quoteStatus !== 0 && quote.quoteStatus !== 3 && quote.quoteStatus !== 6) return false
   if (bargainRecords.value.length === 0) return false
   const lastRecord = bargainRecords.value[bargainRecords.value.length - 1]
   return lastRecord.fromUserType === 'buyer' && lastRecord.action === 'request_reprice'
@@ -711,15 +712,19 @@ onMounted(loadRfq)
 
         <div class="card-table">
           <el-table v-loading="rfqLoading" :data="rfqRecords" border highlight-current-row>
+            <el-table-column label="状态" width="100" fixed>
+              <template #default="{ row }"><StatusTag :value="row.rfqStatus" prefix="RFQ" /></template>
+            </el-table-column>
             <el-table-column prop="rfqNo" label="RFQ编号" width="160" />
             <el-table-column prop="rfqTitle" label="RFQ标题" min-width="200" show-overflow-tooltip />
             <el-table-column prop="remark" label="询价备注" min-width="160" show-overflow-tooltip />
             <el-table-column prop="currency" label="币种" width="80" />
-            <el-table-column prop="quoteDeadline" label="报价截止" width="160" />
-            <el-table-column label="状态" width="100">
-              <template #default="{ row }"><StatusTag :value="row.rfqStatus" prefix="RFQ" /></template>
+            <el-table-column label="报价截止" width="160">
+              <template #default="{ row }">{{ formatDateDisplay(row.quoteDeadline) }}</template>
             </el-table-column>
-            <el-table-column prop="publishTime" label="发布时间" width="160" />
+            <el-table-column label="发布时间" width="160">
+              <template #default="{ row }">{{ formatDateDisplay(row.publishTime) }}</template>
+            </el-table-column>
             <el-table-column label="操作" width="180">
               <template #default="{ row }">
                 <template v-if="row.rfqStatus === 1 || row.rfqStatus === 2">
@@ -754,6 +759,9 @@ onMounted(loadRfq)
 
         <div class="card-table">
           <el-table v-loading="quoteLoading" :data="quoteRecords" border highlight-current-row>
+            <el-table-column label="状态" width="100" fixed>
+              <template #default="{ row }"><StatusTag :value="row.quoteStatus" prefix="QT" /></template>
+            </el-table-column>
             <el-table-column prop="quoteNo" label="报价单号" width="160" />
             <el-table-column prop="rfqId" label="关联RFQ" width="100" />
             <el-table-column prop="currency" label="币种" width="80" />
@@ -763,15 +771,14 @@ onMounted(loadRfq)
             <el-table-column prop="taxAmount" label="税额" width="120">
               <template #default="{ row }">{{ row.taxAmount?.toLocaleString() }}</template>
             </el-table-column>
-            <el-table-column label="状态" width="100">
-              <template #default="{ row }"><StatusTag :value="row.quoteStatus" prefix="QT" /></template>
+            <el-table-column label="提交时间" width="160">
+              <template #default="{ row }">{{ formatDateDisplay(row.submitTime) }}</template>
             </el-table-column>
-            <el-table-column prop="submitTime" label="提交时间" width="160" />
             <el-table-column label="操作" width="320">
               <template #default="{ row }">
                 <el-button link type="primary" @click="openDetail(row)">详情</el-button>
                 <el-button link type="warning" @click="openBargainView(row)">议价记录</el-button>
-                <el-button v-if="row.quoteStatus === 0" link type="success" @click="openResubmit(row)">继续报价</el-button>
+                <el-button v-if="row.quoteStatus === 0 || row.quoteStatus === 6" link type="success" @click="openResubmit(row)">继续报价</el-button>
                 <el-button v-if="row.quoteStatus === 1" link type="primary" @click="openEditQuoteDialog(row)">编辑</el-button>
                 <el-button v-if="row.quoteStatus === 3" link type="success" @click="openResubmit(row)">重新报价</el-button>
                 <el-button v-if="row.quoteStatus === 1" link type="danger" @click="handleWithdraw(row)">撤回</el-button>
@@ -813,7 +820,9 @@ onMounted(loadRfq)
         <el-table-column prop="spec" label="规格" width="120" />
         <el-table-column prop="unit" label="单位" width="70" />
         <el-table-column prop="quantity" label="数量" width="80" />
-        <el-table-column prop="deliveryDate" label="要求交期" width="120" />
+        <el-table-column label="要求交期" width="120">
+          <template #default="{ row }">{{ formatDateDisplay(row.deliveryDate) }}</template>
+        </el-table-column>
       </el-table>
       <template #footer>
         <el-button @click="rfqLinesVisible = false">关闭</el-button>
@@ -839,7 +848,7 @@ onMounted(loadRfq)
               <span class="continue-rfq-label">状态：</span>
               <StatusTag :value="continueRfq.rfqStatus" prefix="RFQ" />
               <span style="margin-left: 16px;">币种：{{ continueRfq.currency }}</span>
-              <span style="margin-left: 16px;">报价截止：{{ continueRfq.quoteDeadline }}</span>
+              <span style="margin-left: 16px;">报价截止：{{ formatDateDisplay(continueRfq.quoteDeadline) }}</span>
             </div>
             <div v-if="continueRfq.remark">
               <span class="continue-rfq-label">询价备注：</span>
@@ -872,7 +881,9 @@ onMounted(loadRfq)
             <el-table-column label="状态" width="90">
               <template #default="{ row }"><StatusTag :value="row.quoteStatus" prefix="QT" /></template>
             </el-table-column>
-            <el-table-column prop="submitTime" label="提交时间" width="150" />
+            <el-table-column label="提交时间" width="150">
+              <template #default="{ row }">{{ formatDateDisplay(row.submitTime) }}</template>
+            </el-table-column>
             <el-table-column label="采购方回应" min-width="150">
               <template #default="{ row }">
                 <template v-if="row.id === latestQuoteForContinue?.id && continueBargainRecords.length > 0">
@@ -978,7 +989,7 @@ onMounted(loadRfq)
             <el-descriptions-item label="币种">{{ latestQuoteForContinue.currency }}</el-descriptions-item>
             <el-descriptions-item label="总金额">{{ latestQuoteForContinue.totalAmount?.toLocaleString() }}</el-descriptions-item>
             <el-descriptions-item label="税额">{{ latestQuoteForContinue.taxAmount?.toLocaleString() }}</el-descriptions-item>
-            <el-descriptions-item label="提交时间">{{ latestQuoteForContinue.submitTime || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="提交时间">{{ formatDateDisplay(latestQuoteForContinue.submitTime) || '-' }}</el-descriptions-item>
             <el-descriptions-item label="状态">
               <StatusTag :value="latestQuoteForContinue.quoteStatus" prefix="QT" />
             </el-descriptions-item>
@@ -991,7 +1002,9 @@ onMounted(loadRfq)
             <el-table-column prop="materialName" label="物料名称" min-width="130" />
             <el-table-column prop="unitPrice" label="单价" width="100" />
             <el-table-column prop="totalPrice" label="小计" width="100" />
-            <el-table-column prop="deliveryDate" label="交期" width="110" />
+            <el-table-column label="交期" width="110">
+              <template #default="{ row }">{{ formatDateDisplay(row.deliveryDate) }}</template>
+            </el-table-column>
           </el-table>
         </template>
       </div>
@@ -1154,7 +1167,7 @@ onMounted(loadRfq)
           <el-timeline-item
             v-for="item in bargainRecords"
             :key="item.id"
-            :timestamp="item.createTime"
+            :timestamp="formatDateDisplay(item.createTime)"
             :type="item.fromUserType === 'buyer' ? 'primary' : 'success'"
             placement="top"
           >
@@ -1308,8 +1321,8 @@ onMounted(loadRfq)
           <el-descriptions-item label="状态">
             <StatusTag :value="detailRow.quoteStatus" prefix="QT" />
           </el-descriptions-item>
-          <el-descriptions-item label="有效期至">{{ detailRow.validUntil || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="提交时间">{{ detailRow.submitTime || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="有效期至">{{ formatDateDisplay(detailRow.validUntil) || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="提交时间">{{ formatDateDisplay(detailRow.submitTime) || '-' }}</el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ detailRow.remark || '-' }}</el-descriptions-item>
         </el-descriptions>
         <el-divider>报价明细行</el-divider>
@@ -1321,7 +1334,9 @@ onMounted(loadRfq)
           <el-table-column prop="materialName" label="物料名称" min-width="130" />
           <el-table-column prop="unitPrice" label="单价" width="100" />
           <el-table-column prop="totalPrice" label="小计" width="110" />
-          <el-table-column prop="deliveryDate" label="交期" width="110" />
+          <el-table-column label="交期" width="110">
+            <template #default="{ row }">{{ formatDateDisplay(row.deliveryDate) }}</template>
+          </el-table-column>
           <el-table-column prop="paymentTerms" label="付款条件" width="100" />
         </el-table>
       </template>

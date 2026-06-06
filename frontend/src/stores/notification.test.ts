@@ -64,6 +64,7 @@ describe('notification store', () => {
           module: 'supplier',
           businessType: 'supplier',
           businessId: 10,
+          businessNo: '',
           priority: 'high',
           dueDate: '2026-05-28',
           createTime: '2026-05-27',

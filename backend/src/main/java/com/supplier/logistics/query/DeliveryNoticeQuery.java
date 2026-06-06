@@ -15,6 +15,7 @@ public class DeliveryNoticeQuery {
     private Long pageSize = 10L;
     private String keyword;
     private Long supplierId;
+    private Long orderId;
     private Integer deliveryStatus;
     private LocalDate startDate;
     private LocalDate endDate;

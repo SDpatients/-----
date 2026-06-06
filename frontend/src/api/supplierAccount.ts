@@ -49,4 +49,7 @@ export const supplierAccountApi = {
 
   toggleStatus: (id: number | string, status: number) =>
     request.put<void, void>(`/v1/supplier-accounts/${id}/status`, null, { params: { status } }),
+
+  delete: (id: number | string) =>
+    request.delete<void, void>(`/v1/supplier-accounts/${id}`),
 }

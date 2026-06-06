@@ -11,22 +11,15 @@ export interface TrendSeries {
   value: number
   orderCount?: number
   deliveryCount?: number
-  qualityIssueCount?: number
-  reconciliationCount?: number
 }
 
 export interface RiskWarning {
-  id: number
+  id: string
   title: string
   level: string
   module: string
   targetPath: string
-}
-
-export interface PerformanceMetric {
-  label: string
-  value: string
-  color: string
+  count?: number
 }
 
 export interface BoardRefreshConfig {

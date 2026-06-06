@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { logisticsApi } from '@/api/logistics'
+import { formatDateDisplay } from '@/lib/utils'
 import PageContainer from '@/components/common/PageContainer.vue'
 import type { WriteOffRecord } from '@/types/business'
 import dayjs from 'dayjs'
@@ -131,7 +132,9 @@ onMounted(loadData)
           <el-tag :type="statusMap[row.status] || 'info'" size="small">{{ row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="createTime" label="创建时间" width="170" />
+      <el-table-column label="创建时间" width="170">
+        <template #default="{ row }">{{ formatDateDisplay(row.createTime) }}</template>
+      </el-table-column>
     </el-table>
 
     <el-pagination

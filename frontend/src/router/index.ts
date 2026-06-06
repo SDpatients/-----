@@ -9,22 +9,13 @@ import SupplierListView from '@/views/purchasing/SupplierListView.vue'
 import MaterialListView from '@/views/purchasing/MaterialListView.vue'
 import OrderListView from '@/views/purchasing/OrderListView.vue'
 import OrderChangeListView from '@/views/purchasing/OrderChangeListView.vue'
-import OrderSyncStatusView from '@/views/purchasing/OrderSyncStatusView.vue'
 import AsnListView from '@/views/purchasing/AsnListView.vue'
 import AsnCreateView from '@/views/purchasing/AsnCreateView.vue'
 import ScanReceivingView from '@/views/purchasing/ScanReceivingView.vue'
 import WriteOffView from '@/views/purchasing/WriteOffView.vue'
-import QualityListView from '@/views/purchasing/QualityListView.vue'
-import PurchasingQualityView from '@/views/purchasing/PurchasingQualityView.vue'
-import IQCStandardView from '@/views/purchasing/IQCStandardView.vue'
-import EightDEditView from '@/views/purchasing/EightDEditView.vue'
-import SettlementListView from '@/views/purchasing/SettlementListView.vue'
-import PurchasingFinanceView from '@/views/purchasing/PurchasingFinanceView.vue'
 import RfqListView from '@/views/purchasing/RfqListView.vue'
 import RfqDetailView from '@/views/purchasing/RfqDetailView.vue'
 import QuoteCompareView from '@/views/purchasing/QuoteCompareView.vue'
-import VmiForecastView from '@/views/purchasing/VmiForecastView.vue'
-import IntegrationConfigView from '@/views/purchasing/IntegrationConfigView.vue'
 import ExchangeRateView from '@/views/purchasing/ExchangeRateView.vue'
 import BusinessDetailView from '@/views/purchasing/BusinessDetailView.vue'
 import SystemConfigView from '@/views/purchasing/SystemConfigView.vue'
@@ -34,13 +25,12 @@ import SupplierOrderCenterView from '@/views/supplier/SupplierOrderCenterView.vu
 import SupplierDeliveryCenterView from '@/views/supplier/SupplierDeliveryCenterView.vue'
 import SupplierDeliveryCreateView from '@/views/supplier/SupplierDeliveryCreateView.vue'
 import SupplierDeliveryDetailView from '@/views/supplier/SupplierDeliveryDetailView.vue'
-import SupplierQualityCenterView from '@/views/supplier/SupplierQualityCenterView.vue'
-import SupplierSettlementCenterView from '@/views/supplier/SupplierSettlementCenterView.vue'
 import SupplierRfqQuoteView from '@/views/supplier/SupplierRfqQuoteView.vue'
 import SupplierProfileView from '@/views/supplier/SupplierProfileView.vue'
 import SupplierRegisterView from '@/views/supplier/SupplierRegisterView.vue'
 import BlacklistView from '@/views/purchasing/BlacklistView.vue'
 import FaqView from '@/views/purchasing/FaqView.vue'
+import FinancialReconciliationView from '@/views/purchasing/FinancialReconciliationView.vue'
 import ForbiddenView from '@/views/error/ForbiddenView.vue'
 import NotFoundView from '@/views/error/NotFoundView.vue'
 
@@ -82,25 +72,15 @@ const routes: RouteRecordRaw[] = [
       { path: 'orders', component: OrderListView, meta: { title: '采购订单', permission: 'order:view' } },
       { path: 'orders/:id', component: BusinessDetailView, meta: { title: '订单详情', moduleName: '订单详情', activeMenu: '/purchasing/orders', permission: 'order:view' } },
       { path: 'order-changes', component: OrderChangeListView, meta: { title: '订单变更(PCO)', permission: 'order:change' } },
-      { path: 'order-sync', component: OrderSyncStatusView, meta: { title: 'ERP订单同步', activeMenu: '/purchasing/integration', permission: 'integration:view' } },
       { path: 'asn', component: AsnListView, meta: { title: '物流与交付', permission: 'asn:view' } },
       { path: 'asn/create', component: AsnCreateView, meta: { title: '创建 ASN', activeMenu: '/purchasing/asn', permission: 'asn:create' } },
       { path: 'asn/scan-receive', component: ScanReceivingView, meta: { title: '扫码收货', activeMenu: '/purchasing/asn', permission: 'asn:view' } },
       { path: 'asn/write-off', component: WriteOffView, meta: { title: '冲销调整', activeMenu: '/purchasing/asn', permission: 'asn:view' } },
       { path: 'asn/:id', component: BusinessDetailView, meta: { title: 'ASN详情', moduleName: 'ASN详情', activeMenu: '/purchasing/asn', permission: 'asn:view' } },
-      { path: 'quality', component: QualityListView, meta: { title: '质量检验', permission: 'quality:view' } },
-      { path: 'quality-ext', component: PurchasingQualityView, meta: { title: '全面质量管理', permission: 'quality:view' } },
-      { path: 'quality-iqc', component: IQCStandardView, meta: { title: 'IQC检验标准', permission: 'quality:view' } },
-      { path: 'quality/8d/:id/edit', component: EightDEditView, meta: { title: '8D报告编辑', moduleName: '8D报告编辑', activeMenu: '/purchasing/quality-ext', permission: 'quality:view' } },
-      { path: 'quality/:id', component: BusinessDetailView, meta: { title: '质量详情', moduleName: '质量详情', activeMenu: '/purchasing/quality', permission: 'quality:view' } },
-      { path: 'settlements', component: SettlementListView, meta: { title: '对账管理', permission: 'settlement:view' } },
-      { path: 'finance', component: PurchasingFinanceView, meta: { title: '全面财务管理', permission: 'finance:view' } },
-      { path: 'settlements/:id', component: BusinessDetailView, meta: { title: '对账详情', moduleName: '对账详情', activeMenu: '/purchasing/settlements', permission: 'settlement:view' } },
+      { path: 'financial-reconciliation', component: FinancialReconciliationView, meta: { title: '财务对账', permission: 'finance:view' } },
       { path: 'rfq', component: RfqListView, meta: { title: 'RFQ询价', permission: 'rfq:view' } },
       { path: 'rfq/:id', component: RfqDetailView, meta: { title: 'RFQ详情', activeMenu: '/purchasing/rfq', permission: 'rfq:view' } },
       { path: 'quotes', component: QuoteCompareView, meta: { title: '报价对比', permission: 'quote:view' } },
-      { path: 'vmi', component: VmiForecastView, meta: { title: 'VMI与需求预测', permission: 'inventory:view' } },
-      { path: 'integration', component: IntegrationConfigView, meta: { title: '集成网关', permission: 'integration:view' } },
       { path: 'exchange-rates', component: ExchangeRateView, meta: { title: '汇率配置', permission: 'config:view' } },
       { path: 'settings', component: SystemConfigView, meta: { title: '系统配置', permission: 'config:view' } },
       { path: 'dict', component: DictManageView, meta: { title: '字典管理', permission: 'config:view' } },
@@ -120,8 +100,6 @@ const routes: RouteRecordRaw[] = [
       { path: 'deliveries', component: SupplierDeliveryCenterView, meta: { title: '发货中心', permission: 'supplier:delivery:view' } },
       { path: 'deliveries/create', component: SupplierDeliveryCreateView, meta: { title: '创建发货通知', activeMenu: '/supplier/deliveries', permission: 'supplier:delivery:create' } },
       { path: 'deliveries/:id', component: SupplierDeliveryDetailView, meta: { title: '发货详情', moduleName: '发货详情', activeMenu: '/supplier/deliveries', permission: 'supplier:delivery:view' } },
-      { path: 'quality', component: SupplierQualityCenterView, meta: { title: '质量中心', permission: 'supplier:quality:view' } },
-      { path: 'settlements', component: SupplierSettlementCenterView, meta: { title: '财务中心', permission: 'supplier:settlement:view' } },
       { path: 'rfq', component: SupplierRfqQuoteView, meta: { title: 'RFQ报价', permission: 'supplier:rfq:view' } },
       { path: 'profile', component: SupplierProfileView, meta: { title: '资料中心', permission: 'supplier:profile:view' } },
     ],

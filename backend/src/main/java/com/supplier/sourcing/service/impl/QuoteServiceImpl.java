@@ -44,6 +44,8 @@ import com.supplier.sourcing.vo.BargainVO;
 import com.supplier.sourcing.vo.QuoteNegotiationVO;
 import com.supplier.sourcing.vo.QuoteVO;
 import com.supplier.sourcing.vo.RfqSummaryVO;
+import com.supplier.portal.dto.PortalTodoCreateDTO;
+import com.supplier.portal.service.PortalTodoService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -76,6 +78,7 @@ public class QuoteServiceImpl implements QuoteService {
     private final QuoteAwardMapper quoteAwardMapper;
     private final SupplierService supplierService;
     private final DomainEventPublisher domainEventPublisher;
+    private final PortalTodoService portalTodoService;
 
     @Override
     public PageResult<QuoteVO> page(QuoteQuery query) {
@@ -212,6 +215,9 @@ public class QuoteServiceImpl implements QuoteService {
         entity.setQuoteStatus(QuoteStatusEnum.SUBMITTED.getCode());
         entity.setSubmitTime(LocalDateTime.now());
         quoteMapper.updateById(entity);
+
+        // 为采购方创建待办：待确认报价
+        createBuyerQuoteTodo(entity);
     }
 
     /**
@@ -279,6 +285,9 @@ public class QuoteServiceImpl implements QuoteService {
         entity.setQuoteStatus(QuoteStatusEnum.PRICED.getCode());
         quoteMapper.updateById(entity);
 
+        // 报价被采纳后自动完成关联待办
+        portalTodoService.autoFinishByBusiness("quote", entity.getId());
+
         // 2) 同询价单下其他已提交报价自动标记为"未采纳"
         List<Quote> siblingQuotes = quoteMapper.selectList(new LambdaQueryWrapper<Quote>()
                 .eq(Quote::getRfqId, entity.getRfqId())
@@ -312,6 +321,7 @@ public class QuoteServiceImpl implements QuoteService {
         PurchaseOrderCreateDTO orderDto = new PurchaseOrderCreateDTO();
         orderDto.setOrderNo(generateOrderNo());
         orderDto.setSupplierId(entity.getSupplierId());
+        orderDto.setSupplierName(supplierService.getDetail(entity.getSupplierId()).getSupplierName());
         orderDto.setOrderDate(orderDate);
         orderDto.setDeliveryDate(earliestDeliveryDate);
         orderDto.setCurrency(entity.getCurrency() != null ? entity.getCurrency() : "CNY");
@@ -549,7 +559,7 @@ public class QuoteServiceImpl implements QuoteService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @AuditLog(module = "报价", businessType = "quote", action = "发起议价", businessIdExpr = "#id", beforeStatusExpr = "1", afterStatusExpr = "0")
+    @AuditLog(module = "报价", businessType = "quote", action = "发起议价", businessIdExpr = "#id", beforeStatusExpr = "1", afterStatusExpr = "6")
     public void bargain(Long id, BargainDTO dto) {
         Quote entity = quoteMapper.selectById(id);
         if (entity == null) {
@@ -562,7 +572,7 @@ public class QuoteServiceImpl implements QuoteService {
 
         int nextRound = (entity.getNegotiationRound() != null ? entity.getNegotiationRound() : 0) + 1;
         entity.setNegotiationRound(nextRound);
-        entity.setQuoteStatus(QuoteStatusEnum.DRAFT.getCode());
+        entity.setQuoteStatus(QuoteStatusEnum.NEGOTIATING.getCode());
         quoteMapper.updateById(entity);
 
         QuoteNegotiation negotiation = new QuoteNegotiation();
@@ -599,15 +609,16 @@ public class QuoteServiceImpl implements QuoteService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @AuditLog(module = "报价", businessType = "quote", action = "重新提交报价", businessIdExpr = "#quoteId", beforeStatusExpr = "0", afterStatusExpr = "1")
+    @AuditLog(module = "报价", businessType = "quote", action = "重新提交报价", businessIdExpr = "#quoteId", beforeStatusExpr = "0|3|6", afterStatusExpr = "1")
     public void resubmit(Long quoteId, QuoteUpdateDTO dto) {
         Quote entity = quoteMapper.selectById(quoteId);
         if (entity == null) {
             throw BusinessException.of(ResultCode.NOT_FOUND);
         }
         if (!QuoteStatusEnum.DRAFT.getCode().equals(entity.getQuoteStatus())
-                && !QuoteStatusEnum.REJECTED.getCode().equals(entity.getQuoteStatus())) {
-            throw BusinessException.of(ResultCode.STATUS_NOT_ALLOWED.getCode(), "只有草稿或未采纳状态可重新提交");
+                && !QuoteStatusEnum.REJECTED.getCode().equals(entity.getQuoteStatus())
+                && !QuoteStatusEnum.NEGOTIATING.getCode().equals(entity.getQuoteStatus())) {
+            throw BusinessException.of(ResultCode.STATUS_NOT_ALLOWED.getCode(), "只有草稿、未采纳或议价中状态可重新提交");
         }
         checkRfqNotClosed(entity.getRfqId());
 
@@ -823,6 +834,7 @@ public class QuoteServiceImpl implements QuoteService {
         String orderNo = generateOrderNo();
         orderDto.setOrderNo(orderNo);
         orderDto.setSupplierId(entity.getSupplierId());
+        orderDto.setSupplierName(supplierService.getDetail(entity.getSupplierId()).getSupplierName());
         orderDto.setOrderDate(LocalDate.now());
         orderDto.setDeliveryDate(dto.getDeliveryDate());
         orderDto.setCurrency(dto.getAwardCurrency() != null ? dto.getAwardCurrency() : entity.getCurrency());
@@ -844,5 +856,20 @@ public class QuoteServiceImpl implements QuoteService {
     private String generateOrderNo() {
         String datePart = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         return "PO" + datePart + String.format("%04d", System.currentTimeMillis() % 10000);
+    }
+
+    private void createBuyerQuoteTodo(Quote quote) {
+        try {
+            PortalTodoCreateDTO todoDto = new PortalTodoCreateDTO();
+            todoDto.setTodoType("quote_confirm");
+            todoDto.setBusinessType("quote");
+            todoDto.setBusinessId(quote.getId());
+            todoDto.setBusinessNo(quote.getQuoteNo());
+            todoDto.setTitle("待确认报价单 " + quote.getQuoteNo());
+            todoDto.setDueTime(quote.getValidUntil() != null ? quote.getValidUntil() : LocalDateTime.now().plusDays(3));
+            portalTodoService.create(todoDto);
+        } catch (Exception e) {
+            log.warn("创建报价待办失败: quoteId={}", quote.getId(), e);
+        }
     }
 }

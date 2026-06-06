@@ -28,6 +28,8 @@ import com.supplier.sourcing.mapper.RfqMapper;
 import com.supplier.sourcing.query.RfqQuery;
 import com.supplier.sourcing.service.RfqService;
 import com.supplier.sourcing.vo.RfqVO;
+import com.supplier.portal.dto.PortalTodoCreateDTO;
+import com.supplier.portal.service.PortalTodoService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -54,6 +56,7 @@ public class RfqServiceImpl implements RfqService {
     private final QuoteMapper quoteMapper;
     private final QuoteAwardMapper quoteAwardMapper;
     private final PurchaseOrderService purchaseOrderService;
+    private final PortalTodoService portalTodoService;
 
     @Override
     public PageResult<RfqVO> page(RfqQuery query) {
@@ -216,6 +219,11 @@ public class RfqServiceImpl implements RfqService {
             rfqSupplierMapper.updateById(rs);
         }
         log.info("[RFQ-DEBUG] publish rfqId={}, 已将 {} 条记录从 inviteStatus=0 更新为 1", id, invitedList.size());
+
+        // 为被邀请的供应商创建待办：待报价
+        for (RfqSupplier rs : invitedList) {
+            createSupplierRfqTodo(entity, rs.getSupplierId());
+        }
     }
 
     @Override
@@ -232,6 +240,8 @@ public class RfqServiceImpl implements RfqService {
         entity.setRfqStatus(RfqStatusEnum.CLOSED.getCode());
         entity.setCloseTime(LocalDateTime.now());
         rfqMapper.updateById(entity);
+        // 截止询价后自动完成关联待办
+        portalTodoService.autoFinishByBusiness("rfq", entity.getId());
     }
 
     @Override
@@ -315,5 +325,21 @@ public class RfqServiceImpl implements RfqService {
         award.setOrderId(orderId);
         award.setOrderNo(orderDTO.getOrderNo());
         quoteAwardMapper.updateById(award);
+    }
+
+    private void createSupplierRfqTodo(Rfq rfq, Long supplierId) {
+        try {
+            PortalTodoCreateDTO todoDto = new PortalTodoCreateDTO();
+            todoDto.setSupplierId(supplierId);
+            todoDto.setTodoType("rfq_quote");
+            todoDto.setBusinessType("rfq");
+            todoDto.setBusinessId(rfq.getId());
+            todoDto.setBusinessNo(rfq.getRfqNo());
+            todoDto.setTitle("待报价询价单 " + rfq.getRfqNo());
+            todoDto.setDueTime(rfq.getQuoteDeadline() != null ? rfq.getQuoteDeadline() : LocalDateTime.now().plusDays(3));
+            portalTodoService.create(todoDto);
+        } catch (Exception e) {
+            log.warn("创建询价单待办失败: rfqId={}, supplierId={}", rfq.getId(), supplierId, e);
+        }
     }
 }

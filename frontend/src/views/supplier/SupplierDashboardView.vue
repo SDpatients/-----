@@ -38,5 +38,5 @@ onMounted(async () => {
 
 <style scoped>
 .supplier-dashboard { display: grid; gap: 18px; }
-.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
 </style>

@@ -63,4 +63,17 @@ describe('riskMap', () => {
     expect(riskMap.medium.type).toBe('warning')
     expect(riskMap.high.type).toBe('danger')
   })
+
+  it('should support backend level aliases (warning / danger)', () => {
+    expect(riskMap.warning).toBeDefined()
+    expect(riskMap.danger).toBeDefined()
+    expect(riskMap.warning.type).toBe('warning')
+    expect(riskMap.danger.type).toBe('danger')
+  })
+
+  it('should have valid tag types for aliases', () => {
+    const validTypes = ['success', 'warning', 'danger', 'info', 'primary']
+    expect(validTypes).toContain(riskMap.warning.type)
+    expect(validTypes).toContain(riskMap.danger.type)
+  })
 })

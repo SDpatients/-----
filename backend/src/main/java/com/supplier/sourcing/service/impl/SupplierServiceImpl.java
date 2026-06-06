@@ -161,7 +161,6 @@ public class SupplierServiceImpl implements SupplierService {
         entity.setTaxNumber(dto.getTaxNumber());
         entity.setRemark(dto.getRemark());
         entity.setStatus(SupplierStatusEnum.APPROVED.getCode());
-        entity.setRating(0);
         supplierInfoMapper.insert(entity);
         return entity.getId();
     }

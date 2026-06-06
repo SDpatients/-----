@@ -16,6 +16,7 @@ public class PurchaseOrderVO {
     private String orderNo;
     @JsonSerialize(using = ToStringSerializer.class)
     private Long supplierId;
+    private String supplierName;
     private LocalDate orderDate;
     private LocalDate deliveryDate;
     private String currency;
@@ -28,4 +29,15 @@ public class PurchaseOrderVO {
     private String buyerName;
     private String deliveryAddress;
     private String remark;
+
+    /** 订单明细总数量（所有明细行quantity之和） */
+    private BigDecimal totalQty;
+    /** 已发货总数量（所有明细行deliveredQty之和） */
+    private BigDecimal shippedQty;
+    /** 已收货总数量（所有明细行receivedQty之和） */
+    private BigDecimal receivedQty;
+    /** 在途总数量（已发-已收） */
+    private BigDecimal inTransitQty;
+    /** 订单明细行列表 */
+    private java.util.List<PurchaseOrderDetailVO> details;
 }

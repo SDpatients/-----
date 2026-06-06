@@ -2,23 +2,30 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowDown, Edit } from '@element-plus/icons-vue'
+import { ArrowDown, Edit, QuestionFilled } from '@element-plus/icons-vue'
 import { supplierApi } from '@/api/supplier'
 import { blacklistApi } from '@/api/blacklist'
 import { getIdempotentHeaders } from '@/utils/idempotent'
 import { toSupplier } from '@/api/adapters'
 import PageContainer from '@/components/common/PageContainer.vue'
-import StatusTag from '@/components/business/StatusTag.vue'
 import ExportDialog from '@/components/business/ExportDialog.vue'
 import SupplierAccountDialog from './SupplierAccountDialog.vue'
 import type { Supplier } from '@/types/business'
+
+// ==================== FAQ ====================
+const faqVisible = ref(false)
+const faqList = [
+  { q: '黑名单有什么实际意义？', a: '供应商加入黑名单后：① 该供应商将无法收到新的采购订单和RFQ询价；② 黑名单供应商在列表中会以红色标签标记，方便识别；③ 黑名单可设置有效期，到期后自动解除，也可手动提前解除；④ 黑名单记录保留历史轨迹，支持审计追溯。' },
+  { q: '黑名单和禁用有什么区别？', a: '黑名单侧重于风险管理，通常用于严重违规（如质量事故、欺诈行为），供应商会被限制参与新业务但历史数据可查。禁用（停用）是临时管理手段，用于供应商信息需更新、暂停合作等场景，可随时恢复。' },
+  { q: '供应商准入流程是怎样的？', a: '新增供应商后，系统会校验信用代码唯一性及黑名单状态。审核通过后，供应商状态变为「已准入」，即可参与采购订单和RFQ询价等业务。当前所有新供应商经审核通过后即为「已准入」状态，不再有中间状态。' },
+]
 
 const router = useRouter()
 const loading = ref(false)
 const records = ref<Supplier[]>([])
 const total = ref(0)
 const exportVisible = ref(false)
-const query = reactive({ pageNum: 1, pageSize: 10, keyword: '', status: undefined as number | undefined, includeBlacklisted: false })
+const query = reactive({ pageNum: 1, pageSize: 10, keyword: '', includeBlacklisted: false })
 
 const accountDialogVisible = ref(false)
 const accountSupplierId = ref<number | string>('')
@@ -60,7 +67,6 @@ const loadData = async () => {
 
 const resetQuery = () => {
   query.keyword = ''
-  query.status = undefined
   query.includeBlacklisted = false
   loadData()
 }
@@ -211,7 +217,11 @@ const submitEdit = async () => {
 </script>
 
 <template>
-  <PageContainer title="供应商管理" subtitle="覆盖供应商准入、资质、绩效与风险状态">
+  <PageContainer title="供应商管理">
+    <template #subtitle>
+      <span>覆盖供应商准入、资质与黑名单管理</span>
+      <el-button class="ml-1" :icon="QuestionFilled" circle size="small" @click="faqVisible = true" />
+    </template>
     <template #actions>
       <el-button type="primary" @click="openCreateDialog">新增供应商</el-button>
       <el-button @click="$router.push('/purchasing/blacklist')">黑名单管理</el-button>
@@ -221,11 +231,6 @@ const submitEdit = async () => {
       <el-form inline :model="query" @submit.prevent="loadData">
         <el-form-item label="关键词">
           <el-input v-model="query.keyword" placeholder="供应商名称/编码/信用代码" clearable @clear="loadData" @keyup.enter="loadData" />
-        </el-form-item>
-        <el-form-item label="准入状态">
-          <el-select v-model="query.status" placeholder="全部" clearable style="width: 160px" @change="loadData">
-            <el-option v-for="s in statusChain" :key="s.status" :label="s.label" :value="s.status" />
-          </el-select>
         </el-form-item>
         <el-form-item label="黑名单">
           <el-checkbox v-model="query.includeBlacklisted" @change="loadData">包含黑名单</el-checkbox>
@@ -251,19 +256,11 @@ const submitEdit = async () => {
         </template>
       </el-table-column>
       <el-table-column prop="category" label="品类" width="110" />
-      <el-table-column prop="level" label="等级" width="80" />
-      <el-table-column label="准入状态" width="150">
-        <template #default="{ row }">
-          <StatusTag :value="row.status" />
-        </template>
-      </el-table-column>
-      <el-table-column label="风险" width="110"><template #default="{ row }"><StatusTag :value="row.blacklisted ? 'blacklisted' : row.riskLevel" :kind="row.blacklisted ? 'risk' : 'risk'" /></template></el-table-column>
       <el-table-column prop="accountCount" label="账号数" width="80" align="center">
         <template #default="{ row }">
           <el-tag :type="row.accountCount > 0 ? 'success' : 'info'" size="small" effect="plain">{{ row.accountCount }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="performanceScore" label="绩效分" width="90" />
       <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="router.push(`/purchasing/suppliers/${row.id}`)">详情</el-button>
@@ -404,6 +401,16 @@ const submitEdit = async () => {
     </el-dialog>
 
     <SupplierAccountDialog v-model:visible="accountDialogVisible" :supplier-id="accountSupplierId" :supplier-name="accountSupplierName" @changed="onAccountChanged" />
+
+    <!-- FAQ 弹窗 -->
+    <el-dialog v-model="faqVisible" title="供应商管理 FAQ" width="640px" destroy-on-close>
+      <div class="faq-list">
+        <div v-for="(faq, idx) in faqList" :key="idx" class="faq-item">
+          <p class="faq-q">{{ idx + 1 }}. {{ faq.q }}</p>
+          <p class="faq-a">{{ faq.a }}</p>
+        </div>
+      </div>
+    </el-dialog>
   </PageContainer>
 </template>
 
@@ -421,5 +428,34 @@ const submitEdit = async () => {
 }
 .ml-2 {
   margin-left: 8px;
+}
+.ml-1 {
+  margin-left: 6px;
+}
+.faq-list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.faq-item {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eee;
+}
+.faq-item:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+.faq-q {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a2b4c;
+}
+.faq-a {
+  margin: 0;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.7;
 }
 </style>

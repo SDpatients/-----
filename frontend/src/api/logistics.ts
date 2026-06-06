@@ -16,10 +16,13 @@ export const logisticsApi = {
     request.post<void, void>(`/v1/delivery-notices/${id}/ship`, data),
   arrive: (id: number | string, remark?: string, discrepancy?: ReceiptDiff) =>
     request.post<void, void>(`/v1/delivery-notices/${id}/arrive`, { remark, discrepancy }),
-  triggerQuality: (id: number | string) => request.post<void, void>(`/v1/delivery-notices/${id}/trigger-quality`),
   confirmWarehousing: (id: number | string) => request.post<void, void>(`/v1/delivery-notices/${id}/warehousing`),
   confirmScanReceive: (id: number | string, data: { receivedQty: number; location?: string; remark?: string }) =>
     request.post<void, void>(`/v1/delivery-notices/${id}/scan-receive`, data),
+  confirmReceive: (id: number | string, data?: { remark?: string; warehouse?: string }) =>
+    request.post<void, void>(`/v1/delivery-notices/${id}/confirm-receive`, data),
+  rejectReceive: (id: number | string, data?: { remark?: string }) =>
+    request.post<void, void>(`/v1/delivery-notices/${id}/reject-receive`, data),
   writeOffPage: async (params: PageQuery) => asPage<WriteOffRecord>(await request.get<ApiPage<WriteOffRecord>, ApiPage<WriteOffRecord>>('/v1/write-offs', { params }), params.pageNum, params.pageSize),
   createWriteOff: (data: Partial<WriteOffRecord>) => request.post<number, number>('/v1/write-offs', data),
 

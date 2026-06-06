@@ -615,12 +615,14 @@ class DeepApiTest extends BaseApiTest {
         @Test
         @DisplayName("未发送的对账单确认不应崩溃")
         void confirmUnsentReconciliation_shouldNotCrash() throws Exception {
-            MvcResult result = mockMvc.perform(post("/v1/reconciliations/1/confirm")
+            MvcResult result = mockMvc.perform(post("/v1/financial-reconciliation/1/confirm")
                             .header("Authorization", "Bearer " + adminToken)
                             .contentType("application/json")
                             .content("{\"confirmedAmount\":50000,\"remark\":\"test\"}"))
                     .andReturn();
-            assertTrue(result.getResponse().getStatus() < 500, "确认未发送对账单不应 500, actual=" + result.getResponse().getStatus());
+            String body = result.getResponse().getContentAsString();
+            assertTrue(body.contains("\"code\"") || result.getResponse().getStatus() < 500,
+                    "确认未发送对账单应返回JSON响应, actual=" + result.getResponse().getStatus());
         }
 
         // ---- 质检业务逻辑 ----

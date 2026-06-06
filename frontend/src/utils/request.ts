@@ -36,6 +36,7 @@ export class ApiError extends Error {
 const service = axios.create({
   baseURL: API_BASE_URL,
   timeout: 20000,
+  paramsSerializer: { indexes: null },
   transformResponse: [
     (data) => {
       if (typeof data === 'string') {
@@ -135,8 +136,36 @@ rawRequest.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 export const downloadBlob = async (config: AxiosRequestConfig, fileName = 'download') => {
   const response = await rawRequest.request<Blob>(config)
   const disposition = response.headers['content-disposition'] as string | undefined
-  const matched = disposition?.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i)
-  const finalName = matched ? decodeURIComponent(matched[1]) : fileName
+  let finalName = fileName
+
+  if (disposition) {
+    // Try RFC 5987 format: filename*=UTF-8''encoded_name
+    const utf8Match = disposition.match(/filename\*=UTF-8''(.+?)(?:;|$)/i)
+    if (utf8Match) {
+      finalName = decodeURIComponent(utf8Match[1])
+    } else {
+      // Try standard quoted filename: filename="name"
+      const quotedMatch = disposition.match(/filename="([^"]+)"/i)
+      if (quotedMatch) {
+        finalName = decodeURIComponent(quotedMatch[1])
+      } else {
+        // Try simple filename: filename=name
+        const simpleMatch = disposition.match(/filename=([^;]+)/i)
+        if (simpleMatch) {
+          finalName = decodeURIComponent(simpleMatch[1].trim())
+        }
+      }
+    }
+
+    // Handle Q-encoding: =?UTF-8?Q?encoded?=
+    const qEncodedMatch = finalName.match(/=\?UTF-8\?Q\?(.+?)\?=/i)
+    if (qEncodedMatch) {
+      finalName = qEncodedMatch[1]
+        .replace(/_/g, ' ')
+        .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    }
+  }
+
   const url = window.URL.createObjectURL(response.data)
   const link = document.createElement('a')
   link.href = url
@@ -186,7 +215,7 @@ const handleApiError = (error: ApiError) => {
     return
   }
   if (error.code === 40902) {
-    ElMessage.warning('请勿重复提交')
+    ElMessage.warning(error.message || '请勿重复提交')
     return
   }
   if (error.code === 50001) {

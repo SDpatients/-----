@@ -4,6 +4,7 @@ import com.supplier.common.exception.BusinessException;
 import com.supplier.common.result.ResultCode;
 import com.supplier.order.dto.PurchaseOrderCreateDTO;
 import com.supplier.order.service.PurchaseOrderService;
+import com.supplier.portal.service.PortalTodoService;
 import com.supplier.security.model.LoginUser;
 import com.supplier.security.util.SecurityUtils;
 import com.supplier.sourcing.dto.PricingDTO;
@@ -56,6 +57,9 @@ class RfqServiceTest extends BaseUnitTest {
 
     @Mock
     private PurchaseOrderService purchaseOrderService;
+
+    @Mock
+    private PortalTodoService portalTodoService;
 
     private Rfq closedRfq;
     private Quote submittedQuote;

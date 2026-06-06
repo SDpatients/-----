@@ -9,6 +9,7 @@ import AttachmentPanel from '@/components/business/AttachmentPanel.vue'
 import AttachmentUpload from '@/components/business/AttachmentUpload.vue'
 import AttachmentVersionList from '@/components/business/AttachmentVersionList.vue'
 import OperationLogTable from '@/components/business/OperationLogTable.vue'
+import { formatDateDisplay } from '@/lib/utils'
 import type { QuoteRecord, RfqRecord, RfqLineItem, QuoteLineItem, BargainRecord } from '@/types/business'
 
 const route = useRoute()
@@ -28,6 +29,8 @@ const invitedSuppliers = ref<{ supplierId: number; supplierName: string; inviteS
 // 报价列表
 const quotesLoading = ref(false)
 const quoteRecords = ref<QuoteRecord[]>([])
+const quoteLinesMap = ref<Record<number | string, QuoteLineItem[]>>({})
+const quoteLinesLoading = ref<Record<number | string, boolean>>({})
 
 const activeTab = ref('quotes')
 
@@ -63,9 +66,22 @@ const loadInvitedSuppliers = async () => {
 
 const loadQuotes = async () => {
   quotesLoading.value = true
+  quoteLinesMap.value = {}
   try {
     const result = await quoteApi.page({ pageNum: 1, pageSize: 50, keyword: '' })
     quoteRecords.value = result.records.filter((q) => q.rfqId === id.value)
+    // 自动加载每个报价的明细行
+    await Promise.all(quoteRecords.value.map(async (q) => {
+      quoteLinesLoading.value[q.id] = true
+      try {
+        const lines = await quoteApi.lines(q.id)
+        quoteLinesMap.value[q.id] = lines
+      } catch {
+        quoteLinesMap.value[q.id] = []
+      } finally {
+        quoteLinesLoading.value[q.id] = false
+      }
+    }))
   } finally {
     quotesLoading.value = false
   }
@@ -110,7 +126,7 @@ const handleCancel = async () => {
 /* ==================== 报价操作 ==================== */
 const handleAdopt = async (row: QuoteRecord) => {
   try {
-    await ElMessageBox.confirm(`确认采纳报价 ${row.quoteNo}？`, '确认采纳')
+    await ElMessageBox.confirm(`确认同意该报价吗？同意后将自动拒绝该RFQ下的其他报价。`, '确认采纳')
     await quoteApi.adopt(row.id)
     ElMessage.success('已采纳')
     loadQuotes()
@@ -143,7 +159,7 @@ const submitConvert = async () => {
   if (!convertQuoteId.value) return
   convertLoading.value = true
   try {
-    const orderId = await quoteApi.convertToOrder(convertQuoteId.value, {
+    await quoteApi.convertToOrder(convertQuoteId.value, {
       type: convertForm.type,
       remark: convertForm.remark,
     })
@@ -152,25 +168,6 @@ const submitConvert = async () => {
     convertVisible.value = false
   } finally {
     convertLoading.value = false
-  }
-}
-
-/* ==================== 报价详情弹窗（含明细行） ==================== */
-const quoteDetailVisible = ref(false)
-const quoteDetailRow = ref<QuoteRecord | null>(null)
-const quoteDetailLines = ref<QuoteLineItem[]>([])
-const quoteDetailLoading = ref(false)
-
-const openQuoteDetail = async (row: QuoteRecord) => {
-  quoteDetailRow.value = row
-  quoteDetailVisible.value = true
-  quoteDetailLoading.value = true
-  try {
-    quoteDetailLines.value = await quoteApi.lines(row.id)
-  } catch {
-    quoteDetailLines.value = []
-  } finally {
-    quoteDetailLoading.value = false
   }
 }
 
@@ -259,7 +256,7 @@ onMounted(() => {
           </div>
           <div>
             <div class="head-label">报价截止</div>
-            <strong>{{ detail.quoteDeadline }}</strong>
+            <strong>{{ formatDateDisplay(detail.quoteDeadline) }}</strong>
           </div>
         </div>
 
@@ -270,9 +267,9 @@ onMounted(() => {
           <el-descriptions-item label="询价单号">{{ detail.rfqNo }}</el-descriptions-item>
           <el-descriptions-item label="询价标题" :span="2">{{ detail.rfqTitle }}</el-descriptions-item>
           <el-descriptions-item label="币种">{{ detail.currency }}</el-descriptions-item>
-          <el-descriptions-item label="报价截止时间">{{ detail.quoteDeadline }}</el-descriptions-item>
+          <el-descriptions-item label="报价截止时间">{{ formatDateDisplay(detail.quoteDeadline) }}</el-descriptions-item>
           <el-descriptions-item label="状态">{{ statusLabel }}</el-descriptions-item>
-          <el-descriptions-item label="发布时间">{{ detail.publishTime || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="发布时间">{{ formatDateDisplay(detail.publishTime) }}</el-descriptions-item>
           <el-descriptions-item label="备注" :span="3">{{ detail.remark || '-' }}</el-descriptions-item>
         </el-descriptions>
 
@@ -312,14 +309,41 @@ onMounted(() => {
               <el-table-column prop="spec" label="规格" width="120" />
               <el-table-column prop="unit" label="单位" width="70" />
               <el-table-column prop="quantity" label="数量" width="80" />
-              <el-table-column prop="deliveryDate" label="交货日期" width="120" />
+              <el-table-column label="交货日期" width="120">
+                <template #default="{ row }">{{ formatDateDisplay(row.deliveryDate) }}</template>
+              </el-table-column>
               <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
             </el-table>
             <el-empty v-if="!linesLoading && rfqLines.length === 0" description="暂无物料明细" :image-size="40" />
           </el-tab-pane>
 
           <el-tab-pane label="报价列表" name="quotes">
-            <el-table v-loading="quotesLoading" :data="quoteRecords" border>
+            <el-table v-loading="quotesLoading" :data="quoteRecords" border row-key="id" :default-expand-all="true">
+              <el-table-column type="expand">
+                <template #default="{ row }">
+                  <div v-loading="quoteLinesLoading[row.id]" class="quote-expand-body">
+                    <el-table :data="quoteLinesMap[row.id] || []" border size="small" class="quote-lines-table">
+                      <el-table-column label="行号" width="55" align="center">
+                        <template #default="{ $index }">{{ $index + 1 }}</template>
+                      </el-table-column>
+                      <el-table-column prop="materialCode" label="物料编码" width="120" />
+                      <el-table-column prop="materialName" label="物料名称" min-width="130" />
+                      <el-table-column prop="spec" label="规格" width="100" />
+                      <el-table-column prop="unitPrice" label="单价" width="100" />
+                      <el-table-column prop="quantity" label="数量" width="70" />
+                      <el-table-column prop="totalPrice" label="小计" width="110">
+                        <template #default="{ row: ql }">{{ ql.totalPrice?.toLocaleString() }}</template>
+                      </el-table-column>
+                      <el-table-column label="交期" width="110">
+                        <template #default="{ row: ql }">{{ formatDateDisplay(ql.deliveryDate) }}</template>
+                      </el-table-column>
+                      <el-table-column prop="paymentTerms" label="付款条件" width="100" />
+                      <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
+                    </el-table>
+                    <el-empty v-if="!(quoteLinesLoading[row.id]) && !(quoteLinesMap[row.id] || []).length" description="暂无明细行" :image-size="30" />
+                  </div>
+                </template>
+              </el-table-column>
               <el-table-column prop="quoteNo" label="报价单号" width="170" />
               <el-table-column prop="supplierName" label="供应商" width="150" />
               <el-table-column prop="currency" label="币种" width="80" />
@@ -332,11 +356,14 @@ onMounted(() => {
               <el-table-column label="状态" width="110">
                 <template #default="{ row }"><StatusTag :value="row.quoteStatus" prefix="QT" /></template>
               </el-table-column>
-              <el-table-column prop="validUntil" label="有效期至" width="130" />
-              <el-table-column prop="submitTime" label="提交时间" width="170" />
-              <el-table-column label="操作" width="300" fixed="right">
+              <el-table-column label="有效期至" width="130">
+                <template #default="{ row }">{{ formatDateDisplay(row.validUntil) }}</template>
+              </el-table-column>
+              <el-table-column label="提交时间" width="170">
+                <template #default="{ row }">{{ formatDateDisplay(row.submitTime) }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="240" fixed="right">
                 <template #default="{ row }">
-                  <el-button link type="primary" @click="openQuoteDetail(row)">明细</el-button>
                   <el-button v-if="row.quoteStatus === 1" link type="warning" @click="openBargain(row)">议价</el-button>
                   <el-button v-if="row.quoteStatus === 1" link type="success" @click="handleAdopt(row)">采纳</el-button>
                   <el-button v-if="row.quoteStatus === 2" link type="primary" @click="openConvert(row)">转订单</el-button>
@@ -362,45 +389,6 @@ onMounted(() => {
       </template>
     </div>
 
-    <!-- 报价详情弹窗（含明细行） -->
-    <el-dialog v-model="quoteDetailVisible" title="报价详情" width="800px" destroy-on-close>
-      <template v-if="quoteDetailRow">
-        <el-descriptions :column="2" border size="small">
-          <el-descriptions-item label="报价单号">{{ quoteDetailRow.quoteNo }}</el-descriptions-item>
-          <el-descriptions-item label="供应商">{{ quoteDetailRow.supplierName }}</el-descriptions-item>
-          <el-descriptions-item label="币种">{{ quoteDetailRow.currency }}</el-descriptions-item>
-          <el-descriptions-item label="含税总金额">{{ quoteDetailRow.totalAmount?.toLocaleString() }}</el-descriptions-item>
-          <el-descriptions-item label="税额">{{ quoteDetailRow.taxAmount?.toLocaleString() }}</el-descriptions-item>
-          <el-descriptions-item label="状态">
-            <StatusTag :value="quoteDetailRow.quoteStatus" prefix="QT" />
-          </el-descriptions-item>
-          <el-descriptions-item label="有效期至">{{ quoteDetailRow.validUntil || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="提交时间">{{ quoteDetailRow.submitTime || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="备注" :span="2">{{ quoteDetailRow.remark || '-' }}</el-descriptions-item>
-        </el-descriptions>
-
-        <el-divider>报价明细行</el-divider>
-        <el-table v-loading="quoteDetailLoading" :data="quoteDetailLines" border size="small">
-          <el-table-column label="行号" width="55" align="center">
-            <template #default="{ $index }">{{ $index + 1 }}</template>
-          </el-table-column>
-          <el-table-column prop="materialCode" label="物料编码" width="120" />
-          <el-table-column prop="materialName" label="物料名称" min-width="130" />
-          <el-table-column prop="spec" label="规格" width="100" />
-          <el-table-column prop="unitPrice" label="单价" width="100" />
-          <el-table-column prop="quantity" label="数量" width="70" />
-          <el-table-column prop="totalPrice" label="小计" width="110">
-            <template #default="{ row }">{{ row.totalPrice?.toLocaleString() }}</template>
-          </el-table-column>
-          <el-table-column prop="deliveryDate" label="交期" width="110" />
-          <el-table-column prop="paymentTerms" label="付款条件" width="100" />
-        </el-table>
-      </template>
-      <template #footer>
-        <el-button @click="quoteDetailVisible = false">关闭</el-button>
-      </template>
-    </el-dialog>
-
     <!-- 议价/还价弹窗 -->
     <el-dialog v-model="bargainVisible" title="议价沟通" width="700px" destroy-on-close>
       <template v-if="bargainQuoteId">
@@ -415,7 +403,7 @@ onMounted(() => {
             <el-timeline-item
               v-for="item in bargainRecords"
               :key="item.id"
-              :timestamp="item.createTime"
+              :timestamp="formatDateDisplay(item.createTime)"
               :type="item.fromUserType === 'buyer' ? 'primary' : 'success'"
               placement="top"
             >
@@ -578,5 +566,14 @@ onMounted(() => {
 }
 .timeline-price-detail .price-supplier {
   color: #67c23a;
+}
+
+/* 报价展开明细 */
+.quote-expand-body {
+  padding: 12px 20px;
+}
+
+.quote-lines-table {
+  margin-top: 0;
 }
 </style>

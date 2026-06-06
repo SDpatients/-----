@@ -10,6 +10,7 @@ import { dashboardApi } from '@/api/dashboard'
 import { supplierApi } from '@/api/supplier'
 import { materialApi } from '@/api/material'
 import { toSupplier } from '@/api/adapters'
+import { formatDateDisplay } from '@/lib/utils'
 import { toId } from '@/utils/id'
 import PageContainer from '@/components/common/PageContainer.vue'
 import SupplierSelector from '@/components/business/SupplierSelector.vue'
@@ -26,18 +27,20 @@ const total = ref(0)
 const selectedRow = ref<PurchaseOrder | null>(null)
 const exportVisible = ref(false)
 const dateRange = ref<string[]>([])
-const query = reactive<PurchaseOrderQuery>({ pageNum: 1, pageSize: 10, keyword: '', orderStatus: undefined })
+const showAll = ref(false)
+// 默认排除已完成(4)、已取消(5)、已拒单(6)
+const DEFAULT_EXCLUDE_STATUSES = [4, 5, 6]
+const query = reactive<PurchaseOrderQuery>({ pageNum: 1, pageSize: 10, keyword: '', orderStatus: undefined, excludeStatuses: DEFAULT_EXCLUDE_STATUSES })
 
 // 风险预警
 const risks = ref<RiskWarning[]>([])
-const riskSummary = reactive({ overdue: 0, delay: 0, noResponse: 0, shortDelivery: 0 })
+const unconfirmedOrderCount = ref(0)
 
 const loadRisks = async () => {
   try {
     risks.value = await dashboardApi.risks()
-    riskSummary.overdue = risks.value.filter(r => r.level === 'high').length
-    riskSummary.delay = risks.value.filter(r => r.level === 'medium').length
-    riskSummary.noResponse = risks.value.filter(r => r.level === 'low' && r.module === 'order_pending').length
+    const pendingRisk = risks.value.find(r => r.module === 'order_pending')
+    unconfirmedOrderCount.value = pendingRisk?.count ?? 0
   } catch { /* */ }
 }
 
@@ -47,6 +50,9 @@ const loadData = async () => {
     const params: PurchaseOrderQuery = { pageNum: query.pageNum, pageSize: query.pageSize }
     if (query.keyword) params.keyword = query.keyword
     if (query.orderStatus !== undefined && query.orderStatus !== null) params.orderStatus = query.orderStatus
+    if (!showAll.value && !query.orderStatus && query.orderStatus !== 0) {
+      params.excludeStatuses = DEFAULT_EXCLUDE_STATUSES
+    }
     if (dateRange.value?.length === 2) {
       params.startDate = dateRange.value[0]
       params.endDate = dateRange.value[1]
@@ -63,6 +69,7 @@ const loadData = async () => {
 const resetQuery = () => {
   query.keyword = ''
   query.orderStatus = undefined
+  showAll.value = false
   dateRange.value = []
   loadData()
 }
@@ -146,6 +153,7 @@ const submitCreate = async () => {
     const orderId = await orderApi.create({
       orderNo: createForm.orderNo || undefined,
       supplierId: createForm.supplierId,
+      supplierName: createForm.supplierName || undefined,
       orderDate: createForm.orderDate,
       deliveryDate: createForm.deliveryDate || undefined,
       currency: createForm.currency,
@@ -307,23 +315,11 @@ onMounted(() => { loadData(); loadRisks() })
       <el-button @click="exportVisible = true">导出</el-button>
     </template>
 
-    <!-- 风险看板 3.2.6 -->
+    <!-- 风险看板 -->
     <div class="risk-board">
-      <div class="risk-item risk-high">
-        <span class="risk-count">{{ riskSummary.overdue }}</span>
-        <span class="risk-label">逾期订单</span>
-      </div>
-      <div class="risk-item risk-medium">
-        <span class="risk-count">{{ riskSummary.delay }}</span>
-        <span class="risk-label">延期风险</span>
-      </div>
-      <div class="risk-item risk-low">
-        <span class="risk-count">{{ riskSummary.noResponse }}</span>
-        <span class="risk-label">未响应</span>
-      </div>
-      <div class="risk-item risk-info">
-        <span class="risk-count">{{ riskSummary.shortDelivery }}</span>
-        <span class="risk-label">短交风险</span>
+      <div class="risk-item risk-warning">
+        <span class="risk-count">{{ unconfirmedOrderCount }}</span>
+        <span class="risk-label">未确认订单量</span>
       </div>
     </div>
 
@@ -342,6 +338,11 @@ onMounted(() => { loadData(); loadRisks() })
             <el-option label="已取消" :value="5" />
             <el-option label="已拒单" :value="6" />
           </el-select>
+          <el-button
+            :type="showAll ? 'primary' : 'default'"
+            style="margin-left: 8px"
+            @click="showAll = !showAll; query.orderStatus = undefined; loadData()"
+          >{{ showAll ? '隐藏已完成' : '显示全部' }}</el-button>
         </el-form-item>
         <el-form-item label="日期范围">
           <el-date-picker
@@ -368,11 +369,17 @@ onMounted(() => { loadData(); loadRisks() })
       highlight-current-row
       @row-click="(row: PurchaseOrder) => selectedRow = row"
     >
+      <el-table-column label="状态" width="100" fixed><template #default="{ row }"><StatusTag :value="row.orderStatus" prefix="订单" /></template></el-table-column>
       <el-table-column prop="orderNo" label="订单号" width="160" />
       <el-table-column prop="supplierName" label="供应商" min-width="180" />
       <el-table-column prop="buyer" label="采购员" width="100" />
       <el-table-column prop="amount" label="金额" width="120" />
       <!-- 3.2.4 交付跟踪列 -->
+      <el-table-column label="总量" width="80">
+        <template #default="{ row }">
+          <span class="total-qty">{{ row.totalQty || 0 }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="已发/已收" width="110">
         <template #default="{ row }">
           <span class="delivery-stat">{{ row.shippedQty || 0 }} / {{ row.receivedQty || 0 }}</span>
@@ -380,12 +387,19 @@ onMounted(() => { loadData(); loadRisks() })
       </el-table-column>
       <el-table-column label="在途" width="80">
         <template #default="{ row }">
-          <span :class="(row.shippedQty || 0) - (row.receivedQty || 0) > 0 ? 'in-transit' : ''">
-            {{ Math.max(0, (row.shippedQty || 0) - (row.receivedQty || 0)) }}
+          <span :class="(row.inTransitQty || 0) > 0 ? 'in-transit' : ''">
+            {{ row.inTransitQty || 0 }}
           </span>
         </template>
       </el-table-column>
-      <el-table-column prop="deliveryDate" label="交期" width="120" />
+      <el-table-column label="未到量" width="80">
+        <template #default="{ row }">
+          <span class="remaining-qty">{{ Math.max((row.totalQty || 0) - (row.receivedQty || 0), 0) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="交期" width="120">
+        <template #default="{ row }">{{ formatDateDisplay(row.deliveryDate) }}</template>
+      </el-table-column>
       <el-table-column label="确认状态" width="100">
         <template #default="{ row }">
           <el-tag size="small" :type="row.confirmStatus === '已确认' ? 'success' : row.confirmStatus === '已拒单' ? 'danger' : 'info'">
@@ -393,7 +407,6 @@ onMounted(() => { loadData(); loadRisks() })
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="状态" width="100"><template #default="{ row }"><StatusTag :value="row.status" /></template></el-table-column>
       <el-table-column label="风险" width="100">
         <template #default="{ row }">
           <span v-if="row.deliveryDate && new Date(row.deliveryDate) < new Date()" class="risk-tag risk-overdue">逾期</span>
@@ -564,7 +577,6 @@ onMounted(() => { loadData(); loadRisks() })
         <el-table-column prop="code" label="供应商编码" width="140" />
         <el-table-column prop="name" label="供应商名称" min-width="180" show-overflow-tooltip />
         <el-table-column prop="category" label="类别" width="120" />
-        <el-table-column prop="level" label="等级" width="100" />
         <el-table-column prop="contact" label="联系人" width="100" />
         <el-table-column prop="phone" label="电话" width="130" />
       </el-table>
@@ -639,13 +651,13 @@ onMounted(() => { loadData(); loadRisks() })
 
 <style scoped>
 .risk-board {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
+  justify-content: center;
   gap: 12px;
   margin-bottom: 16px;
 }
 .risk-item {
-  padding: 14px 16px;
+  padding: 14px 40px;
   border-radius: 10px;
   text-align: center;
   border: 1px solid #e4ebf3;
@@ -661,14 +673,8 @@ onMounted(() => { loadData(); loadRisks() })
   margin-top: 4px;
   color: #718096;
 }
-.risk-high { background: #fef0f0; }
-.risk-high .risk-count { color: #f56c6c; }
-.risk-medium { background: #fdf6ec; }
-.risk-medium .risk-count { color: #e6a23c; }
-.risk-low { background: #f0f9eb; }
-.risk-low .risk-count { color: #67c23a; }
-.risk-info { background: #ecf5ff; }
-.risk-info .risk-count { color: #409eff; }
+.risk-warning { background: #fdf6ec; }
+.risk-warning .risk-count { color: #e6a23c; }
 
 .risk-tag {
   display: inline-block;
@@ -682,6 +688,8 @@ onMounted(() => { loadData(); loadRisks() })
 
 .delivery-stat { font-weight: 500; color: #2c3e50; }
 .in-transit { color: #409eff; font-weight: 600; }
+.total-qty { font-weight: 600; color: #303133; }
+.remaining-qty { font-weight: 600; color: #f56c6c; }
 
 .order-total {
   text-align: right;

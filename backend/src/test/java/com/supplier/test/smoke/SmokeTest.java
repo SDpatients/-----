@@ -167,9 +167,9 @@ class SmokeTest extends BaseApiTest {
                     "orderId": %d,
                     "supplierId": 1,
                     "planDeliveryDate": "2026-06-10",
-                    "carrier": "顺丰速运",
+                    "deliveryCompany": "顺丰速运",
                     "remark": "冒烟测试-ASN",
-                    "details": [
+                    "lines": [
                         {
                             "orderDetailId": 3,
                             "materialCode": "MAT-SMOKE-001",

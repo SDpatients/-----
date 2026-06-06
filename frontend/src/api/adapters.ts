@@ -10,7 +10,6 @@ const qualityResultMap: Record<number, string> = { 0: '待检验', 1: '合格', 
 const reconStatusMap: Record<number, string> = { 0: '草稿', 1: '已发送', 2: '已确认', 3: '有异议', 4: '已完成', 5: '已冻结', 6: '冻结中' }
 
 const supplierTypeMap: Record<number, string> = { 1: '原材料', 2: '辅材', 3: '设备', 4: '服务', 5: '其他' }
-const ratingMap: Record<number, string> = { 1: 'A级', 2: 'B级', 3: 'C级', 4: 'D级' }
 
 const toStatus = (map: Record<number, string>, value: unknown): string => {
   if (typeof value === 'number') return map[value] || String(value)
@@ -48,7 +47,6 @@ export const toSupplier = (item: any): Supplier => ({
   category: supplierTypeMap[item.supplierType] || item.category || '-',
   categoryId: item.categoryId ?? undefined,
   supplierType: item.supplierType ?? undefined,
-  level: ratingMap[item.rating] || item.level || '-',
   status: item.status ?? 0,
   contact: item.contactName || item.contact || '-',
   contactEmail: item.contactEmail || '',
@@ -59,8 +57,6 @@ export const toSupplier = (item: any): Supplier => ({
   city: item.city || '',
   district: item.district || '',
   admissionStage: supplierStatusMap[item.status] || '待审核',
-  performanceScore: Number(item.rating || item.performanceScore || 0),
-  riskLevel: Number(item.rating || 0) >= 4 ? 'low' : 'medium',
   accountCount: Number(item.accountCount ?? 0),
   address: item.address || '-',
   bankName: item.bankName || '',
@@ -98,19 +94,49 @@ export const toOrder = (item: any): PurchaseOrder => ({
   status: toStatus(orderStatusMap, item.orderStatus ?? item.status),
   confirmStatus: orderConfirmText(item.orderStatus ?? item.status, item.confirmTime),
   riskLevel: riskFromDelivery(item.deliveryDate, item.orderStatus ?? item.status),
+  totalQty: Number(item.totalQty || 0),
+  shippedQty: Number(item.shippedQty || 0),
+  receivedQty: Number(item.receivedQty || 0),
+  inTransitQty: Number(item.inTransitQty || 0),
+  details: (item.details || []).map((d: any) => ({
+    id: d.id,
+    lineNo: d.lineNo || 0,
+    materialCode: d.materialCode || '',
+    materialName: d.materialName || '',
+    materialSpec: d.materialSpec || '',
+    unit: d.unit || '',
+    quantity: Number(d.quantity || 0),
+    unitPrice: Number(d.unitPrice || 0),
+    amount: Number(d.amount || 0),
+    deliveredQty: Number(d.deliveredQty || 0),
+    receivedQty: Number(d.receivedQty || 0),
+    deliveryDate: d.deliveryDate || '',
+  })),
 })
 
-export const toAsn = (item: any): AsnNotice => ({
-  id: item.id,
-  asnNo: item.noticeNo || item.asnNo || '-',
-  orderNo: item.orderNo || '-',
-  supplierName: item.supplierName || `供应商${item.supplierId || ''}`,
-  shipDate: item.actualDeliveryDate || item.planDeliveryDate || '-',
-  eta: item.planDeliveryDate || '-',
-  status: toStatus(deliveryStatusMap, item.deliveryStatus ?? item.status),
-  quantity: Number(item.quantity || 0),
-  warehouse: item.deliveryAddress || item.warehouse || '-',
-})
+export const toAsn = (item: any): AsnNotice => {
+  // 数量优先取后端聚合值（list 场景由后端 fillQuantityAggregated 填充）；
+  // 详情接口未填充时回退到本地明细聚合。
+  let totalQty = Number(item.quantity || 0)
+  if (!totalQty) {
+    const details: any[] = item.details || []
+    totalQty = details.reduce(
+      (sum, d) => sum + Number(d.actualQty ?? d.planQty ?? 0),
+      0,
+    )
+  }
+  return {
+    id: item.id,
+    asnNo: item.noticeNo || item.asnNo || '-',
+    orderNo: item.orderNo || '-',
+    supplierName: item.supplierName || `供应商${item.supplierId || ''}`,
+    shipDate: item.actualDeliveryDate || item.planDeliveryDate || '-',
+    eta: item.planDeliveryDate || '-',
+    status: toStatus(deliveryStatusMap, item.deliveryStatus ?? item.status),
+    quantity: totalQty,
+    warehouse: item.warehouse || item.deliveryAddress || '-',
+  }
+}
 
 export const toReceiptRecord = (item: any): ReceiptRecord => ({
   id: item.id,
@@ -193,12 +219,28 @@ export const toOperationLog = (item: any): OperationLogItem => ({
   operatedAt: item.operateTime || '-',
 })
 
+const moduleNameMap: Record<string, string> = {
+  purchase_order: '采购订单',
+  delivery_notice: '送货通知',
+  rfq: '询价单',
+  quote: '报价单',
+  reconciliation: '财务对账',
+  quality_inspection: '质量检验',
+  nonconformance_report: '不合格报告',
+  order_pending: '订单待确认',
+  delivery_delay: '送货逾期',
+  delivery_approaching: '送货即将到期',
+  order_overdue: '订单逾期',
+  rfq_deadline: '询价即将截止',
+}
+
 export const toPortalTodo = (item: any): PortalTodo => ({
   id: item.id,
   title: item.title || '-',
-  module: item.businessType || item.todoType || '-',
+  module: item.module || moduleNameMap[item.businessType] || item.businessType || '-',
   businessType: item.businessType || '',
   businessId: item.businessId || 0,
+  businessNo: item.businessNo || '',
   priority: priorityFromDueTime(item.dueTime),
   dueDate: item.dueTime || '-',
   createTime: item.createTime || '-',

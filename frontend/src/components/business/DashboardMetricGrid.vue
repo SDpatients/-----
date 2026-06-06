@@ -12,5 +12,5 @@ defineProps<{ metrics: DashboardMetric[] }>()
 </template>
 
 <style scoped>
-.metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+.metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 </style>

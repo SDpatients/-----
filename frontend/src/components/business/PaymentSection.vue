@@ -2,6 +2,7 @@
 import { reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { paymentApi } from '@/api/finance'
+import { formatDateDisplay } from '@/lib/utils'
 import StatusTag from '@/components/business/StatusTag.vue'
 import SupplierSelector from '@/components/business/SupplierSelector.vue'
 import type { PaymentCallbackLog } from '@/api/mockData'
@@ -224,7 +225,9 @@ const viewDetail = (row: any) => { detailRow.value = row; detailVisible.value = 
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="paymentTime" label="付款时间" width="160" />
+        <el-table-column label="付款时间" width="160">
+          <template #default="{ row }">{{ formatDateDisplay(row.paymentTime) }}</template>
+        </el-table-column>
         <el-table-column label="操作" :width="isPurchasing ? 200 : 140" fixed="right">
           <template #default="{ row }">
             <!-- 采购方操作 -->
@@ -338,7 +341,9 @@ const viewDetail = (row: any) => { detailRow.value = row; detailVisible.value = 
         <el-table-column prop="invoiceNo" label="发票号" width="170" />
         <el-table-column prop="invoiceAmount" label="发票金额" width="120" />
         <el-table-column prop="taxAmount" label="税额" width="120" />
-        <el-table-column prop="invoiceDate" label="开票日期" width="120" />
+        <el-table-column label="开票日期" width="120">
+          <template #default="{ row }">{{ formatDateDisplay(row.invoiceDate) }}</template>
+        </el-table-column>
         <el-table-column label="发票状态" width="100">
           <template #default="{ row }"><StatusTag :value="row.invoiceStatus" prefix="发票" /></template>
         </el-table-column>
@@ -358,7 +363,7 @@ const viewDetail = (row: any) => { detailRow.value = row; detailVisible.value = 
         <el-descriptions-item label="状态">
           <StatusTag :value="detailRow.paymentStatus" prefix="付款" />
         </el-descriptions-item>
-        <el-descriptions-item label="付款时间" :span="2">{{ detailRow.paymentTime }}</el-descriptions-item>
+        <el-descriptions-item label="付款时间" :span="2">{{ formatDateDisplay(detailRow.paymentTime) }}</el-descriptions-item>
       </el-descriptions>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>

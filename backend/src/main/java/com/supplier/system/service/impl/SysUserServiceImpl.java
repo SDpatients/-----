@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.supplier.common.exception.BusinessException;
 import com.supplier.common.result.PageResult;
 import com.supplier.common.result.ResultCode;
+import com.supplier.security.util.SecurityUtils;
 import com.supplier.system.dto.SysUserCreateDTO;
 import com.supplier.system.dto.SysUserPasswordDTO;
 import com.supplier.system.entity.SysUser;
@@ -91,6 +92,31 @@ public class SysUserServiceImpl implements SysUserService {
         user.setStatus(status);
         user.setTokenVersion((user.getTokenVersion() != null ? user.getTokenVersion() : 0) + 1);
         sysUserMapper.updateById(user);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long id) {
+        SysUser user = getById(id);
+
+        // 供应商用户只能删除自己供应商下的账号
+        if (SecurityUtils.isSupplierUser()) {
+            Long currentSupplierId = SecurityUtils.getSupplierId();
+            if (!user.getSupplierId().equals(currentSupplierId)) {
+                throw BusinessException.of(ResultCode.FORBIDDEN.getCode(), "无权限删除该账号");
+            }
+        }
+
+        // 检查是否至少保留一个账号
+        Long supplierId = user.getSupplierId();
+        LambdaQueryWrapper<SysUser> countWrapper = new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getSupplierId, supplierId);
+        Long accountCount = sysUserMapper.selectCount(countWrapper);
+        if (accountCount <= 1) {
+            throw BusinessException.of(ResultCode.BUSINESS_ERROR.getCode(), "至少需要保留一个供应商账号");
+        }
+
+        sysUserMapper.deleteById(id);
     }
 
     private SysUser getById(Long id) {

@@ -11,6 +11,4 @@ public class DashboardTrendVO {
     private String period;
     private Long orderCount;
     private Long deliveryCount;
-    private Long qualityIssueCount;
-    private Long reconciliationCount;
 }

@@ -8,15 +8,12 @@ import com.supplier.order.mapper.PurchaseOrderMapper;
 import com.supplier.portal.vo.DashboardMetricVO;
 import com.supplier.portal.vo.DashboardRiskVO;
 import com.supplier.portal.vo.DashboardTrendVO;
-import com.supplier.portal.vo.SupplierPerformanceVO;
-import com.supplier.quality.entity.QualityInspection;
-import com.supplier.quality.mapper.QualityInspectionMapper;
 import com.supplier.portal.service.DashboardService;
 import com.supplier.security.util.SecurityUtils;
-import com.supplier.settlement.entity.Reconciliation;
-import com.supplier.settlement.entity.SupplierPerformance;
-import com.supplier.settlement.mapper.ReconciliationMapper;
-import com.supplier.settlement.mapper.SupplierPerformanceMapper;
+import com.supplier.sourcing.entity.Quote;
+import com.supplier.sourcing.entity.Rfq;
+import com.supplier.sourcing.mapper.QuoteMapper;
+import com.supplier.sourcing.mapper.RfqMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -30,18 +27,33 @@ import java.util.List;
 public class DashboardServiceImpl implements DashboardService {
     private final PurchaseOrderMapper purchaseOrderMapper;
     private final DeliveryNoticeMapper deliveryNoticeMapper;
-    private final QualityInspectionMapper qualityInspectionMapper;
-    private final ReconciliationMapper reconciliationMapper;
-    private final SupplierPerformanceMapper supplierPerformanceMapper;
+    private final RfqMapper rfqMapper;
+    private final QuoteMapper quoteMapper;
 
     @Override
     public List<DashboardMetricVO> metrics() {
         Long supplierId = SecurityUtils.isSupplierUser() ? SecurityUtils.getSupplierId() : null;
+
+        if (supplierId != null) {
+            // 供应商视角：待确认订单、未送达的物流、可参与的报价量
+            return List.of(
+                    new DashboardMetricVO("待确认订单",
+                            purchaseOrderMapper.selectCount(orderScope(supplierId).eq(PurchaseOrder::getOrderStatus, 1)), "单", "实时刷新", "/supplier/orders"),
+                    new DashboardMetricVO("未送达的物流",
+                            deliveryNoticeMapper.selectCount(deliveryScope(supplierId).in(DeliveryNotice::getDeliveryStatus, 0, 1, 2)), "单", "实时刷新", "/supplier/deliveries"),
+                    new DashboardMetricVO("可参与的报价量",
+                            quoteMapper.selectCount(quoteScope(supplierId).eq(Quote::getQuoteStatus, 0)), "单", "来自业务聚合数据", "/supplier/rfq")
+            );
+        }
+
+        // 采购方视角：进行中的询价单、收到的未处理报价、未送达的物流
         return List.of(
-                new DashboardMetricVO("订单总数", purchaseOrderMapper.selectCount(orderScope(supplierId)), "单"),
-                new DashboardMetricVO("待确认订单", purchaseOrderMapper.selectCount(orderScope(supplierId).eq(PurchaseOrder::getOrderStatus, 1)), "单"),
-                new DashboardMetricVO("送货通知", deliveryNoticeMapper.selectCount(deliveryScope(supplierId)), "单"),
-                new DashboardMetricVO("对账单", reconciliationMapper.selectCount(reconScope(supplierId)), "单")
+                new DashboardMetricVO("进行中的询价单",
+                        rfqMapper.selectCount(rfqScope().in(Rfq::getRfqStatus, 1, 2)), "单", "来自业务聚合数据", "/purchasing/rfq"),
+                new DashboardMetricVO("收到的未处理报价",
+                        quoteMapper.selectCount(quoteScope(null).eq(Quote::getQuoteStatus, 0)), "单", "实时刷新", "/purchasing/quotes"),
+                new DashboardMetricVO("未送达的物流",
+                        deliveryNoticeMapper.selectCount(deliveryScope(null).in(DeliveryNotice::getDeliveryStatus, 0, 1, 2)), "单", "实时刷新", "/purchasing/asn")
         );
     }
 
@@ -56,9 +68,7 @@ public class DashboardServiceImpl implements DashboardService {
             LocalDate end = month.atEndOfMonth();
             Long orderCount = purchaseOrderMapper.selectCount(orderScope(supplierId).ge(PurchaseOrder::getOrderDate, start).le(PurchaseOrder::getOrderDate, end));
             Long deliveryCount = deliveryNoticeMapper.selectCount(deliveryScope(supplierId).ge(DeliveryNotice::getPlanDeliveryDate, start).le(DeliveryNotice::getPlanDeliveryDate, end));
-            Long qualityCount = qualityInspectionMapper.selectCount(qualityScope(supplierId).eq(QualityInspection::getInspectResult, 2));
-            Long reconCount = reconciliationMapper.selectCount(reconScope(supplierId).eq(Reconciliation::getReconPeriod, month.toString()));
-            list.add(new DashboardTrendVO(month.toString(), orderCount, deliveryCount, qualityCount, reconCount));
+            list.add(new DashboardTrendVO(month.toString(), orderCount, deliveryCount));
         }
         return list;
     }
@@ -66,34 +76,36 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public List<DashboardRiskVO> risks() {
         Long supplierId = SecurityUtils.isSupplierUser() ? SecurityUtils.getSupplierId() : null;
+        LocalDate today = LocalDate.now();
+        // 即将到期窗口：今天 ~ 未来2天
+        LocalDate approachingStart = today.plusDays(1);
+        LocalDate approachingEnd = today.plusDays(2);
         return List.of(
-                new DashboardRiskVO("order_pending", "待确认订单积压", purchaseOrderMapper.selectCount(orderScope(supplierId).eq(PurchaseOrder::getOrderStatus, 1)), "warning"),
-                new DashboardRiskVO("delivery_delay", "计划送货已逾期", deliveryNoticeMapper.selectCount(
-                        deliveryScope(supplierId)
-                                .lt(DeliveryNotice::getPlanDeliveryDate, LocalDate.now())
-                                .lt(DeliveryNotice::getDeliveryStatus, 4)
-                                .isNull(DeliveryNotice::getActualDeliveryDate)), "danger"),
-                new DashboardRiskVO("quality_issue", "不合格质检单", qualityInspectionMapper.selectCount(
-                        qualityScope(supplierId).in(QualityInspection::getInspectResult, 2, 3)), "danger"),
-                new DashboardRiskVO("recon_dispute", "有异议对账单", reconciliationMapper.selectCount(reconScope(supplierId).eq(Reconciliation::getReconStatus, 3)), "warning")
+                new DashboardRiskVO("order_pending", "未确认订单量",
+                        purchaseOrderMapper.selectCount(orderScope(supplierId).eq(PurchaseOrder::getOrderStatus, 1)),
+                        "warning"),
+                new DashboardRiskVO("delivery_delay", "计划送货已逾期",
+                        deliveryNoticeMapper.selectCount(
+                                deliveryScope(supplierId)
+                                        .lt(DeliveryNotice::getPlanDeliveryDate, today)
+                                        .lt(DeliveryNotice::getDeliveryStatus, 4)
+                                        .isNull(DeliveryNotice::getActualDeliveryDate)),
+                        "danger"),
+                new DashboardRiskVO("delivery_approaching", "即将到期待发货",
+                        deliveryNoticeMapper.selectCount(
+                                deliveryScope(supplierId)
+                                        .ge(DeliveryNotice::getPlanDeliveryDate, approachingStart)
+                                        .le(DeliveryNotice::getPlanDeliveryDate, approachingEnd)
+                                        .isNull(DeliveryNotice::getActualDeliveryDate)
+                                        .lt(DeliveryNotice::getDeliveryStatus, 4)),
+                        "warning"),
+                new DashboardRiskVO("order_overdue", "订单交期已逾期",
+                        purchaseOrderMapper.selectCount(
+                                orderScope(supplierId)
+                                        .lt(PurchaseOrder::getDeliveryDate, today)
+                                        .in(PurchaseOrder::getOrderStatus, 0, 1, 2, 3)),
+                        "danger")
         );
-    }
-
-    @Override
-    public List<SupplierPerformanceVO> supplierPerformance() {
-        Long supplierId = SecurityUtils.isSupplierUser() ? SecurityUtils.getSupplierId() : null;
-        YearMonth currentPeriod = YearMonth.now();
-        LambdaQueryWrapper<SupplierPerformance> perfWrapper =
-                new LambdaQueryWrapper<SupplierPerformance>()
-                        .eq(supplierId != null, SupplierPerformance::getSupplierId, supplierId)
-                        .eq(SupplierPerformance::getEvaluatePeriod, currentPeriod.toString())
-                        .orderByDesc(SupplierPerformance::getTotalScore);
-        return supplierPerformanceMapper.selectList(perfWrapper).stream()
-                .map(p -> new SupplierPerformanceVO(
-                        p.getSupplierId(), null,
-                        p.getOntimeRate(), p.getQualifiedRate(),
-                        p.getDeliveryScore(), p.getTotalScore().intValue()))
-                .toList();
     }
 
     private LambdaQueryWrapper<PurchaseOrder> orderScope(Long supplierId) {
@@ -104,11 +116,11 @@ public class DashboardServiceImpl implements DashboardService {
         return new LambdaQueryWrapper<DeliveryNotice>().eq(supplierId != null, DeliveryNotice::getSupplierId, supplierId);
     }
 
-    private LambdaQueryWrapper<Reconciliation> reconScope(Long supplierId) {
-        return new LambdaQueryWrapper<Reconciliation>().eq(supplierId != null, Reconciliation::getSupplierId, supplierId);
+    private LambdaQueryWrapper<Rfq> rfqScope() {
+        return new LambdaQueryWrapper<>();
     }
 
-    private LambdaQueryWrapper<QualityInspection> qualityScope(Long supplierId) {
-        return new LambdaQueryWrapper<QualityInspection>().eq(supplierId != null, QualityInspection::getSupplierId, supplierId);
+    private LambdaQueryWrapper<Quote> quoteScope(Long supplierId) {
+        return new LambdaQueryWrapper<Quote>().eq(supplierId != null, Quote::getSupplierId, supplierId);
     }
 }

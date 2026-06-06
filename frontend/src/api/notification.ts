@@ -54,7 +54,7 @@ export const notificationApi = {
       pages: page.pages,
     }
   },
-  todos: () => request.get<ApiPage<any>, ApiPage<any>>('/v1/todos', { params: { pageNum: 1, pageSize: 100 } }).then((res) => asPage<any>(res, 1, 100).records.map(toPortalTodo)),
+  todos: () => request.get<ApiPage<any>, ApiPage<any>>('/v1/todos', { params: { pageNum: 1, pageSize: 100, todoStatus: 0 } }).then((res) => asPage<any>(res, 1, 100).records.map(toPortalTodo)),
   unreadSummary: async (): Promise<UnreadSummary> => {
     const [messageCount, todoCount] = await Promise.all([
       request.get<number, number>('/v1/messages/unread-count'),

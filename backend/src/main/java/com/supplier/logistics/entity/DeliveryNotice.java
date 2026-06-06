@@ -5,6 +5,7 @@ import com.supplier.common.entity.BaseEntity;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -37,4 +38,18 @@ public class DeliveryNotice extends BaseEntity {
     private LocalDateTime submitTime;
     private LocalDateTime closeTime;
     private String remark;
+    /** 发货总金额 */
+    private BigDecimal totalAmount;
+    /** 币种 */
+    private String currency;
+    /** 税额 */
+    private BigDecimal taxAmount;
+    /** 净额 */
+    private BigDecimal netAmount;
+    /** 付款状态: 0-未付款 1-部分付款 2-已付款 */
+    private Integer paymentStatus;
+    /** 对账状态: 0-待对账 1-对账中 2-已对账 3-有差异 */
+    private Integer reconciliationStatus;
+    /** 收货仓库 */
+    private String warehouse;
 }

@@ -25,10 +25,10 @@ export const permissions = ['dashboard:view', 'supplier:view', 'supplier:audit',
 export const supplierPermissions = ['supplier:dashboard:view', 'supplier:order:view', 'supplier:order:confirm', 'supplier:delivery:view', 'supplier:delivery:create', 'supplier:quality:view', 'supplier:quality:rectify', 'supplier:settlement:view', 'supplier:rfq:view', 'supplier:profile:view', 'message:view', 'file:upload']
 
 export const suppliers: Supplier[] = [
-  { id: 1, code: 'SUP-2026-001', name: '华东精密制造有限公司', category: '结构件', level: 'A', status: 1, contact: '周明', phone: '13800010001', admissionStage: '已准入', performanceScore: 96, riskLevel: 'low', accountCount: 3, address: '江苏省苏州市工业园区' },
-  { id: 2, code: 'SUP-2026-002', name: '星河电子科技股份有限公司', category: '电子件', level: 'B', status: 0, contact: '林夏', phone: '13800010002', admissionStage: '资质审核', performanceScore: 82, riskLevel: 'medium', accountCount: 2, address: '广东省深圳市南山区' },
-  { id: 3, code: 'SUP-2026-003', name: '北辰包装材料有限公司', category: '包装材料', level: 'C', status: 2, contact: '赵青', phone: '13800010003', admissionStage: '整改中', performanceScore: 68, riskLevel: 'high', accountCount: 1, address: '浙江省杭州市余杭区' },
-  { id: 4, code: 'SUP-2026-004', name: '远航物流装备有限公司', category: '物流装备', level: 'A', status: 1, contact: '陈一', phone: '13800010004', admissionStage: '已准入', performanceScore: 91, riskLevel: 'low', accountCount: 0, address: '上海市嘉定区' },
+  { id: 1, code: 'SUP-2026-001', name: '华东精密制造有限公司', category: '结构件', status: 1, contact: '周明', phone: '13800010001', admissionStage: '已准入', accountCount: 3, address: '江苏省苏州市工业园区' },
+  { id: 2, code: 'SUP-2026-002', name: '星河电子科技股份有限公司', category: '电子件', status: 0, contact: '林夏', phone: '13800010002', admissionStage: '资质审核', accountCount: 2, address: '广东省深圳市南山区' },
+  { id: 3, code: 'SUP-2026-003', name: '北辰包装材料有限公司', category: '包装材料', status: 2, contact: '赵青', phone: '13800010003', admissionStage: '整改中', accountCount: 1, address: '浙江省杭州市余杭区' },
+  { id: 4, code: 'SUP-2026-004', name: '远航物流装备有限公司', category: '物流装备', status: 1, contact: '陈一', phone: '13800010004', admissionStage: '已准入', accountCount: 0, address: '上海市嘉定区' },
 ]
 
 export const orders: PurchaseOrder[] = [
@@ -66,10 +66,10 @@ export const timeline: TimelineItem[] = [
 ]
 
 export const portalTodos: PortalTodo[] = [
-  { id: 1, title: 'PO-202605-0002 待确认交期', module: '订单中心', businessType: 'purchase_order', businessId: 1, priority: 'high', dueDate: '2026-05-22', createTime: '2026-05-20 09:00', status: 'pending' },
-  { id: 2, title: 'ASN-202605-0002 待提交发货明细', module: '发货中心', businessType: 'delivery_notice', businessId: 2, priority: 'medium', dueDate: '2026-05-23', createTime: '2026-05-21 10:00', status: 'pending' },
-  { id: 3, title: '8D-202605-0003 待提交整改报告', module: '质量中心', businessType: 'nonconformance_report', businessId: 1, priority: 'high', dueDate: '2026-05-24', createTime: '2026-05-20 14:00', status: 'processing' },
-  { id: 4, title: 'ST-202605-0002 对账差异待确认', module: '财务中心', businessType: 'reconciliation', businessId: 1, priority: 'medium', dueDate: '2026-05-25', createTime: '2026-05-19 16:00', status: 'processing' },
+  { id: 1, title: 'PO-202605-0002 待确认交期', module: '采购订单', businessType: 'purchase_order', businessId: 1, businessNo: 'PO-202605-0002', priority: 'high', dueDate: '2026-05-22', createTime: '2026-05-20 09:00', status: 'pending' },
+  { id: 2, title: 'ASN-202605-0002 待提交发货明细', module: '送货通知', businessType: 'delivery_notice', businessId: 2, businessNo: 'ASN-202605-0002', priority: 'medium', dueDate: '2026-05-23', createTime: '2026-05-21 10:00', status: 'pending' },
+  { id: 3, title: '8D-202605-0003 待提交整改报告', module: '不合格报告', businessType: 'nonconformance_report', businessId: 1, businessNo: '8D-202605-0003', priority: 'high', dueDate: '2026-05-24', createTime: '2026-05-20 14:00', status: 'processing' },
+  { id: 4, title: 'ST-202605-0002 对账差异待确认', module: '财务对账', businessType: 'reconciliation', businessId: 1, businessNo: 'ST-202605-0002', priority: 'medium', dueDate: '2026-05-25', createTime: '2026-05-19 16:00', status: 'processing' },
 ]
 
 export const attachments: AttachmentFile[] = [
@@ -324,6 +324,66 @@ export const syncTasks = [
   { id: 1, taskNo: 'SYNC-202605-0001', systemType: 'ERP', taskType: '库存同步', taskStatus: 2, retryCount: 0, errorMessage: '', nextRetryTime: '' },
   { id: 2, taskNo: 'SYNC-202605-0002', systemType: 'WMS', taskType: 'ASN入库', taskStatus: 4, retryCount: 3, errorMessage: '目标系统返回500', nextRetryTime: '2026-05-25 12:00:00' },
 ]
+
+/** 财务对账 mock 数据 */
+export const financialReconciliationRecords = [
+  { id: 1, asnNo: 'ASN-202605-0001', orderNo: 'PO-202605-0001', supplierName: '华东精密制造有限公司', totalAmount: 286000, quantity: 1200, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 0, period: '2026-05', createDate: '2026-05-21' },
+  { id: 2, asnNo: 'ASN-202605-0002', orderNo: 'PO-202605-0002', supplierName: '星河电子科技股份有限公司', totalAmount: 458000, quantity: 800, currency: 'CNY', reconciliationStatus: 1, reconciliationStatusLabel: '对账中', paymentStatus: 1, paymentStatusLabel: '部分付款', diffAmount: 3200, period: '2026-05', createDate: '2026-05-22' },
+  { id: 3, asnNo: 'ASN-202605-0003', orderNo: 'PO-202605-0003', supplierName: '北辰包装材料有限公司', totalAmount: 76000, quantity: 3600, currency: 'CNY', reconciliationStatus: 3, reconciliationStatusLabel: '有差异', paymentStatus: 0, paymentStatusLabel: '未付款', diffAmount: 860, period: '2026-05', createDate: '2026-05-19' },
+  { id: 4, asnNo: 'ASN-202605-0004', orderNo: 'PO-202605-0004', supplierName: '远航物流装备有限公司', totalAmount: 198000, quantity: 240, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 1, paymentStatusLabel: '部分付款', diffAmount: 0, period: '2026-04', createDate: '2026-05-18' },
+  { id: 5, asnNo: 'ASN-202604-0005', orderNo: 'PO-202604-0005', supplierName: '华东精密制造有限公司', totalAmount: 195000, quantity: 960, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 0, period: '2026-04', createDate: '2026-04-15' },
+  { id: 6, asnNo: 'ASN-202604-0006', orderNo: 'PO-202604-0006', supplierName: '星河电子科技股份有限公司', totalAmount: 342000, quantity: 1200, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 0, period: '2026-04', createDate: '2026-04-18' },
+  { id: 7, asnNo: 'ASN-202604-0007', orderNo: 'PO-202604-0007', supplierName: '北辰包装材料有限公司', totalAmount: 58000, quantity: 2800, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 0, period: '2026-04', createDate: '2026-04-20' },
+  { id: 8, asnNo: 'ASN-202603-0008', orderNo: 'PO-202603-0008', supplierName: '华东精密制造有限公司', totalAmount: 312000, quantity: 1500, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 0, period: '2026-03', createDate: '2026-03-10' },
+  { id: 9, asnNo: 'ASN-202603-0009', orderNo: 'PO-202603-0009', supplierName: '远航物流装备有限公司', totalAmount: 165000, quantity: 300, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 0, period: '2026-03', createDate: '2026-03-15' },
+  { id: 10, asnNo: 'ASN-202603-0010', orderNo: 'PO-202603-0010', supplierName: '星河电子科技股份有限公司', totalAmount: 228000, quantity: 640, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 0, period: '2026-03', createDate: '2026-03-20' },
+  { id: 11, asnNo: 'ASN-202602-0011', orderNo: 'PO-202602-0011', supplierName: '华东精密制造有限公司', totalAmount: 256000, quantity: 1100, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 0, period: '2026-02', createDate: '2026-02-12' },
+  { id: 12, asnNo: 'ASN-202602-0012', orderNo: 'PO-202602-0012', supplierName: '北辰包装材料有限公司', totalAmount: 92000, quantity: 4200, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 1200, period: '2026-02', createDate: '2026-02-18' },
+  { id: 13, asnNo: 'ASN-202601-0013', orderNo: 'PO-202601-0013', supplierName: '华东精密制造有限公司', totalAmount: 378000, quantity: 1800, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 0, period: '2026-01', createDate: '2026-01-08' },
+  { id: 14, asnNo: 'ASN-202601-0014', orderNo: 'PO-202601-0014', supplierName: '远航物流装备有限公司', totalAmount: 210000, quantity: 450, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 0, period: '2026-01', createDate: '2026-01-15' },
+  { id: 15, asnNo: 'ASN-202601-0015', orderNo: 'PO-202601-0015', supplierName: '星河电子科技股份有限公司', totalAmount: 186000, quantity: 520, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 0, period: '2026-01', createDate: '2026-01-22' },
+  { id: 16, asnNo: 'ASN-202512-0016', orderNo: 'PO-202512-0016', supplierName: '华东精密制造有限公司', totalAmount: 298000, quantity: 1350, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 0, period: '2025-12', createDate: '2025-12-05' },
+  { id: 17, asnNo: 'ASN-202512-0017', orderNo: 'PO-202512-0017', supplierName: '北辰包装材料有限公司', totalAmount: 64000, quantity: 3000, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 0, period: '2025-12', createDate: '2025-12-12' },
+  { id: 18, asnNo: 'ASN-202512-0018', orderNo: 'PO-202512-0018', supplierName: '星河电子科技股份有限公司', totalAmount: 415000, quantity: 960, currency: 'CNY', reconciliationStatus: 2, reconciliationStatusLabel: '已对账', paymentStatus: 2, paymentStatusLabel: '已付款', diffAmount: 0, period: '2025-12', createDate: '2025-12-18' },
+]
+
+export const financialReconciliationOverview = {
+  totalAmount: 4183000,
+  reconciledAmount: 3724000,
+  pendingAmount: 458000,
+  diffAmount: 5260,
+  totalCount: 18,
+  reconciledCount: 15,
+  pendingCount: 2,
+  diffCount: 1,
+}
+
+export const financialReconciliationChartData = {
+  trends: [
+    { period: '2025-12', totalAmount: 777000, reconciledAmount: 777000, diffAmount: 0, count: 3 },
+    { period: '2026-01', totalAmount: 774000, reconciledAmount: 774000, diffAmount: 0, count: 3 },
+    { period: '2026-02', totalAmount: 348000, reconciledAmount: 348000, diffAmount: 1200, count: 2 },
+    { period: '2026-03', totalAmount: 705000, reconciledAmount: 705000, diffAmount: 0, count: 3 },
+    { period: '2026-04', totalAmount: 793000, reconciledAmount: 793000, diffAmount: 0, count: 3 },
+    { period: '2026-05', totalAmount: 1018000, reconciledAmount: 484000, diffAmount: 4060, count: 4 },
+  ],
+  supplierDistribution: [
+    { supplierName: '华东精密制造有限公司', amount: 1725000, count: 6 },
+    { supplierName: '星河电子科技股份有限公司', amount: 1629000, count: 5 },
+    { supplierName: '远航物流装备有限公司', amount: 573000, count: 3 },
+    { supplierName: '北辰包装材料有限公司', amount: 290000, count: 4 },
+  ],
+  paymentStatus: [
+    { status: 'paid', label: '已付款', count: 13, amount: 3321000 },
+    { status: 'partial', label: '部分付款', count: 2, amount: 656000 },
+    { status: 'unpaid', label: '未付款', count: 3, amount: 206000 },
+  ],
+  reconciliationStatus: [
+    { status: 'reconciled', label: '已对账', count: 15, amount: 3724000 },
+    { status: 'processing', label: '对账中', count: 2, amount: 458000 },
+    { status: 'diff', label: '有差异', count: 1, amount: 76000 },
+  ],
+}
 
 export const reconDetails: ReconDetailLine[] = [
   { id: 1, lineNo: 1, businessType: '采购订单', businessNo: 'PO-202605-0001', occurDate: '2026-05-10', amount: 160000, confirmedAmount: 160000, diffAmount: 0, diffReason: '' },

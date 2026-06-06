@@ -15,8 +15,6 @@ const menus = [
   { path: '/supplier/orders', title: '订单中心', icon: Tickets },
   { path: '/supplier/rfq', title: 'RFQ报价', icon: Collection },
   { path: '/supplier/deliveries', title: '发货中心', icon: Van },
-  { path: '/supplier/quality', title: '质量中心', icon: DocumentChecked },
-  { path: '/supplier/settlements', title: '财务中心', icon: Money },
   { path: '/supplier/profile', title: '资料中心', icon: Folder },
 ]
 

@@ -10,7 +10,8 @@ public enum QuoteStatusEnum {
     ACCEPTED(2, "已采纳"),
     REJECTED(3, "未采纳"),
     WITHDRAWN(4, "已撤回"),
-    PRICED(5, "已定价");
+    PRICED(5, "已定价"),
+    NEGOTIATING(6, "议价中");
 
     private final Integer code;
     private final String desc;

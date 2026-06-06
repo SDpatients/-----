@@ -26,6 +26,7 @@ const uploading = ref(false)
 const renameDialogVisible = ref(false)
 const renameTarget = ref<AttachmentFile | null>(null)
 const renameFileName = ref('')
+const renameFileExt = ref('')
 
 const { validateFile } = useAttachment()
 
@@ -44,12 +45,12 @@ const loadFiles = async () => {
 onMounted(loadFiles)
 watch(() => [props.businessType, props.businessId], loadFiles)
 
-const preview = async (id: number) => {
-  await attachmentApi.preview(id)
+const preview = async (row: AttachmentFile) => {
+  await attachmentApi.preview(row.id as number, row.fileName)
 }
 
-const download = async (id: number) => {
-  await attachmentApi.download(id)
+const download = async (row: AttachmentFile) => {
+  await attachmentApi.download(row.id as number, row.fileName)
 }
 
 const handleDelete = async (row: AttachmentFile) => {
@@ -64,7 +65,14 @@ const handleDelete = async (row: AttachmentFile) => {
 
 const openRename = (row: AttachmentFile) => {
   renameTarget.value = row
-  renameFileName.value = row.fileName
+  const lastDotIndex = row.fileName.lastIndexOf('.')
+  if (lastDotIndex > 0) {
+    renameFileName.value = row.fileName.substring(0, lastDotIndex)
+    renameFileExt.value = row.fileName.substring(lastDotIndex) // 包含点号
+  } else {
+    renameFileName.value = row.fileName
+    renameFileExt.value = ''
+  }
   renameDialogVisible.value = true
 }
 
@@ -73,12 +81,13 @@ const submitRename = async () => {
     ElMessage.warning('文件名不能为空')
     return
   }
-  if (renameFileName.value.trim() === renameTarget.value.fileName) {
+  const newFileName = renameFileName.value.trim() + renameFileExt.value
+  if (newFileName === renameTarget.value.fileName) {
     renameDialogVisible.value = false
     return
   }
   try {
-    await attachmentApi.rename(renameTarget.value.id as number, renameFileName.value.trim())
+    await attachmentApi.rename(renameTarget.value.id as number, newFileName)
     ElMessage.success('重命名成功')
     renameDialogVisible.value = false
     loadFiles()
@@ -157,8 +166,8 @@ const formatTime = (val: string) => {
       </el-table-column>
       <el-table-column label="操作" :width="editable ? 250 : 150" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="preview(row.id)">预览</el-button>
-          <el-button link type="success" size="small" @click="download(row.id)">下载</el-button>
+          <el-button link type="primary" size="small" @click="preview(row)">预览</el-button>
+          <el-button link type="success" size="small" @click="download(row)">下载</el-button>
           <template v-if="editable">
             <el-button link type="warning" size="small" @click="openRename(row)">重命名</el-button>
             <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
@@ -175,7 +184,10 @@ const formatTime = (val: string) => {
           <span class="rename-old-name">{{ renameTarget?.fileName }}</span>
         </el-form-item>
         <el-form-item label="新文件名">
-          <el-input v-model="renameFileName" placeholder="请输入新文件名" @keyup.enter="submitRename" />
+          <div class="rename-input-group">
+            <el-input v-model="renameFileName" placeholder="请输入新文件名" @keyup.enter="submitRename" />
+            <span v-if="renameFileExt" class="rename-ext-suffix">{{ renameFileExt }}</span>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -206,5 +218,20 @@ const formatTime = (val: string) => {
 .rename-old-name {
   color: #909399;
   font-size: 13px;
+}
+.rename-input-group {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+.rename-input-group .el-input {
+  flex: 1;
+}
+.rename-ext-suffix {
+  margin-left: 8px;
+  color: #909399;
+  font-size: 14px;
+  white-space: nowrap;
+  user-select: none;
 }
 </style>

@@ -86,6 +86,12 @@ class ResultCodeTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("REDIS_ERROR 的 code 为 50003")
+        void redisErrorCode() {
+            assertEquals(50003, ResultCode.REDIS_ERROR.getCode());
+        }
+
+        @Test
         @DisplayName("BUSINESS_ERROR 的 code 为 40900")
         void businessErrorCode() {
             assertEquals(40900, ResultCode.BUSINESS_ERROR.getCode());
@@ -163,6 +169,12 @@ class ResultCodeTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("REDIS_ERROR 的 message 为 缓存服务异常")
+        void redisErrorMessage() {
+            assertEquals("缓存服务异常", ResultCode.REDIS_ERROR.getMessage());
+        }
+
+        @Test
         @DisplayName("BUSINESS_ERROR 的 message 为 业务异常")
         void businessErrorMessage() {
             assertEquals("业务异常", ResultCode.BUSINESS_ERROR.getMessage());
@@ -189,9 +201,9 @@ class ResultCodeTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("枚举值总数为 12")
+        @DisplayName("枚举值总数为 13")
         void enumValuesCount() {
-            assertEquals(12, ResultCode.values().length);
+            assertEquals(13, ResultCode.values().length);
         }
     }
 }

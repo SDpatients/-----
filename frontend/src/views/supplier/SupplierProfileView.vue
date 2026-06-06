@@ -4,7 +4,9 @@ import { useUserStore } from '@/stores/user'
 import { supplierApi } from '@/api/supplier'
 import type { SupplierCategoryItem } from '@/api/supplier'
 import { qualificationApi } from '@/api/qualification'
+import { supplierAccountApi, type SupplierAccount } from '@/api/supplierAccount'
 import { toSupplier } from '@/api/adapters'
+import { formatDateDisplay } from '@/lib/utils'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageContainer from '@/components/common/PageContainer.vue'
 import AttachmentPanel from '@/components/business/AttachmentPanel.vue'
@@ -37,7 +39,7 @@ const loadSupplier = async () => {
 
 const loadAll = async () => {
   if (!isSupplierUser.value && !supplierId.value) return
-  await Promise.all([loadSupplier(), loadQualifications()])
+  await Promise.all([loadSupplier(), loadQualifications(), loadAccounts()])
 }
 
 onMounted(loadAll)
@@ -242,6 +244,84 @@ const expiringQuals = computed(() => qualifications.value.filter(q => {
 }))
 const hasQualWarnings = computed(() => expiredQuals.value.length > 0 || expiringQuals.value.length > 0)
 
+// ==================== 账号管理 ====================
+const accountLoading = ref(false)
+const accounts = ref<SupplierAccount[]>([])
+
+const showAccountDialog = ref(false)
+const showCreateAccountDialog = ref(false)
+const accountForm = reactive({
+  username: '',
+  password: '',
+  realName: '',
+  phone: '',
+  email: '',
+  remark: '',
+})
+const accountFormRef = ref()
+const accountFormRules = {
+  username: [{ required: true, message: '用户名不能为空', trigger: 'blur' }],
+  password: [{ required: true, message: '密码不能为空', trigger: 'blur' }, { min: 6, max: 32, message: '密码长度6-32位', trigger: 'blur' }],
+  realName: [{ required: true, message: '姓名不能为空', trigger: 'blur' }],
+}
+
+const loadAccounts = async () => {
+  if (!supplierId.value) return
+  accountLoading.value = true
+  try {
+    const result = await supplierAccountApi.page({
+      supplierId: supplierId.value,
+      pageNum: 1,
+      pageSize: 100,
+    })
+    accounts.value = result.records
+  } finally {
+    accountLoading.value = false
+  }
+}
+
+const openAccountDialog = () => {
+  showAccountDialog.value = true
+  loadAccounts()
+}
+
+const openCreateAccount = () => {
+  accountForm.username = ''
+  accountForm.password = ''
+  accountForm.realName = ''
+  accountForm.phone = ''
+  accountForm.email = ''
+  accountForm.remark = ''
+  showCreateAccountDialog.value = true
+}
+
+const submitCreateAccount = async () => {
+  if (!supplierId.value) return
+  try { await accountFormRef.value?.validate() } catch { return }
+  try {
+    await supplierAccountApi.create({
+      supplierId: supplierId.value,
+      ...accountForm,
+    })
+    ElMessage.success('账号创建成功')
+    showCreateAccountDialog.value = false
+    loadAccounts()
+  } catch { /* 拦截器处理 */ }
+}
+
+const handleDeleteAccount = async (row: SupplierAccount) => {
+  if (accounts.value.length <= 1) {
+    ElMessage.warning('至少需要保留一个账号')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(`确定删除账号「${row.username}」吗？`, '删除确认', { type: 'warning' })
+    await supplierAccountApi.delete(row.id)
+    ElMessage.success('账号已删除')
+    loadAccounts()
+  } catch { /* 取消或错误 */ }
+}
+
 /** 省市区合并显示 */
 const regionText = computed(() => {
   const s = supplier.value
@@ -267,9 +347,6 @@ const regionText = computed(() => {
           <div class="detail-item"><div class="detail-label">法定代表人</div><div class="detail-value">{{ supplier.legalPerson || '-' }}</div></div>
           <div class="detail-item"><div class="detail-label">供应品类</div><div class="detail-value">{{ supplier.category }}</div></div>
           <div class="detail-item"><div class="detail-label">状态</div><div class="detail-value"><StatusTag :value="supplier.status" /></div></div>
-          <div class="detail-item"><div class="detail-label">等级</div><div class="detail-value">{{ supplier.level }}</div></div>
-          <div class="detail-item"><div class="detail-label">绩效分</div><div class="detail-value">{{ supplier.performanceScore }}</div></div>
-          <div class="detail-item"><div class="detail-label">风险等级</div><div class="detail-value"><StatusTag :value="supplier.riskLevel" kind="risk" /></div></div>
         </div>
 
         <!-- 联系信息区 -->
@@ -308,7 +385,7 @@ const regionText = computed(() => {
       >
         <template #default>
           <span v-for="q in expiredQuals" :key="q.id" class="qual-alert-item">
-            {{ q.qualName }}（有效期至 {{ q.validEnd }}）
+            {{ q.qualName }}（有效期至 {{ formatDateDisplay(q.validEnd) }}）
           </span>
         </template>
       </el-alert>
@@ -322,7 +399,7 @@ const regionText = computed(() => {
       >
         <template #default>
           <span v-for="q in expiringQuals" :key="q.id" class="qual-alert-item">
-            {{ q.qualName }}（有效期至 {{ q.validEnd }}，剩余 {{ dayjs(q.validEnd).diff(dayjs(), 'day') }} 天）
+            {{ q.qualName }}（有效期至 {{ formatDateDisplay(q.validEnd) }}，剩余 {{ dayjs(q.validEnd).diff(dayjs(), 'day') }} 天）
           </span>
         </template>
       </el-alert>
@@ -336,10 +413,10 @@ const regionText = computed(() => {
         <el-table-column prop="qualName" label="资质名称" min-width="180" />
         <el-table-column prop="qualNo" label="证书编号" width="160" />
         <el-table-column prop="qualOrg" label="颁发机构" min-width="160" />
-        <el-table-column label="有效期" width="200">
+        <el-table-column label="有效期" width="220">
           <template #default="{ row }">
             <span v-if="row.validStart || row.validEnd">
-              {{ row.validStart || '-' }} ~ {{ row.validEnd || '-' }}
+              {{ formatDateDisplay(row.validStart) }} ~ {{ formatDateDisplay(row.validEnd) }}
             </span>
             <span v-else class="text-muted">长期有效</span>
           </template>
@@ -365,6 +442,38 @@ const regionText = computed(() => {
         </el-table-column>
       </el-table>
       <el-empty v-if="!qualLoading && qualifications.length === 0" description="暂无资质证书，请添加" />
+    </div>
+
+    <!-- 账号管理 -->
+    <el-divider>账号管理</el-divider>
+    <div class="account-section">
+      <div class="account-toolbar">
+        <el-button type="primary" size="small" @click="openCreateAccount">新增账号</el-button>
+        <span class="account-count">共 {{ accounts.length }} 个账号</span>
+      </div>
+      <el-table v-loading="accountLoading" :data="accounts" border highlight-current-row size="small">
+        <el-table-column prop="username" label="用户名" width="140" />
+        <el-table-column prop="realName" label="姓名" width="100" />
+        <el-table-column prop="phone" label="手机号" width="140" />
+        <el-table-column prop="email" label="邮箱" min-width="180" />
+        <el-table-column label="状态" width="80" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 1 ? 'success' : 'info'" size="small">{{ row.status === 1 ? '正常' : '禁用' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="最后登录" width="170">
+          <template #default="{ row }">{{ formatDateDisplay(row.lastLoginTime) }}</template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.remark || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="danger" size="small" @click="handleDeleteAccount(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="!accountLoading && accounts.length === 0" description="暂无账号，请添加" />
     </div>
 
     <el-divider>资料附件</el-divider>
@@ -531,6 +640,34 @@ const regionText = computed(() => {
         <el-button type="primary" @click="submitQual">确认</el-button>
       </template>
     </el-dialog>
+
+    <!-- 新增账号弹窗 -->
+    <el-dialog v-model="showCreateAccountDialog" title="新增账号" width="480px" :close-on-click-modal="false">
+      <el-form ref="accountFormRef" :model="accountForm" :rules="accountFormRules" label-width="80px">
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="accountForm.username" placeholder="登录用户名" />
+        </el-form-item>
+        <el-form-item label="密码" prop="password">
+          <el-input v-model="accountForm.password" type="password" placeholder="6-32位" show-password />
+        </el-form-item>
+        <el-form-item label="姓名" prop="realName">
+          <el-input v-model="accountForm.realName" placeholder="真实姓名" />
+        </el-form-item>
+        <el-form-item label="手机号">
+          <el-input v-model="accountForm.phone" placeholder="选填" />
+        </el-form-item>
+        <el-form-item label="邮箱">
+          <el-input v-model="accountForm.email" placeholder="选填" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="accountForm.remark" type="textarea" :rows="2" placeholder="选填" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showCreateAccountDialog = false">取消</el-button>
+        <el-button type="primary" @click="submitCreateAccount">确认新增</el-button>
+      </template>
+    </el-dialog>
   </PageContainer>
 </template>
 
@@ -589,6 +726,21 @@ const regionText = computed(() => {
   margin-bottom: 12px;
   display: flex;
   justify-content: flex-end;
+}
+.account-section {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+}
+.account-toolbar {
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.account-count {
+  font-size: 12px;
+  color: #909399;
 }
 .text-muted {
   color: #909399;

@@ -4,10 +4,13 @@ import com.supplier.common.result.PageResult;
 import com.supplier.common.result.Result;
 import com.supplier.logistics.dto.DeliveryActionDTO;
 import com.supplier.logistics.dto.DeliveryNoticeCreateDTO;
+import com.supplier.logistics.dto.DeliveryNoticeExportRequest;
 import com.supplier.logistics.query.DeliveryNoticeQuery;
 import com.supplier.logistics.service.DeliveryNoticeService;
 import com.supplier.logistics.vo.DeliveryDetailVO;
 import com.supplier.logistics.vo.DeliveryNoticeVO;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -74,18 +77,35 @@ public class DeliveryNoticeController {
         return Result.success();
     }
 
-    @PostMapping("/{id}/trigger-quality")
-    @PreAuthorize("isAuthenticated()")
-    public Result<Void> triggerQuality(@PathVariable @NotNull(message = "送货通知ID不能为空") Long id) {
-        deliveryNoticeService.triggerQuality(id);
-        return Result.success();
-    }
-
     @PostMapping("/{id}/scan-receive")
     @PreAuthorize("isAuthenticated()")
     public Result<Void> scanReceive(@PathVariable @NotNull(message = "送货通知ID不能为空") Long id,
                                     @RequestBody(required = false) DeliveryActionDTO dto) {
         deliveryNoticeService.scanReceive(id, dto);
         return Result.success();
+    }
+
+    @Operation(summary = "确认收货")
+    @PostMapping("/{id}/confirm-receive")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Void> confirmReceive(@PathVariable @NotNull(message = "送货通知ID不能为空") Long id,
+                                       @RequestBody(required = false) DeliveryActionDTO dto) {
+        deliveryNoticeService.confirmReceive(id, dto);
+        return Result.success();
+    }
+
+    @Operation(summary = "拒收")
+    @PostMapping("/{id}/reject-receive")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Void> rejectReceive(@PathVariable @NotNull(message = "送货通知ID不能为空") Long id,
+                                      @RequestBody(required = false) DeliveryActionDTO dto) {
+        deliveryNoticeService.rejectReceive(id, dto);
+        return Result.success();
+    }
+
+    @PostMapping("/export")
+    @PreAuthorize("isAuthenticated()")
+    public Result<Long> export(@Valid @RequestBody DeliveryNoticeExportRequest request) {
+        return Result.success(deliveryNoticeService.export(request));
     }
 }

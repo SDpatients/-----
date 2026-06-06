@@ -16,6 +16,8 @@ public class PurchaseOrderCreateDTO {
     @NotNull(message = "供应商ID不能为空")
     private Long supplierId;
 
+    private String supplierName;
+
     @NotNull(message = "订单日期不能为空")
     private LocalDate orderDate;
 

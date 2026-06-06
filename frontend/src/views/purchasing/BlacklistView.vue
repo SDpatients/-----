@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { blacklistApi } from '@/api/blacklist'
+import { formatDateDisplay } from '@/lib/utils'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
 import type { SupplierBlacklist } from '@/types/business'
@@ -167,10 +168,10 @@ onMounted(loadData)
       <el-table-column prop="creditCode" label="统一信用代码" width="180" />
       <el-table-column prop="reason" label="拉黑原因" min-width="200" show-overflow-tooltip />
       <el-table-column label="生效时间" width="170">
-        <template #default="{ row }">{{ row.startTime || '-' }}</template>
+        <template #default="{ row }">{{ formatDateDisplay(row.startTime) || '-' }}</template>
       </el-table-column>
       <el-table-column label="结束时间" width="170">
-        <template #default="{ row }">{{ row.endTime || '永久' }}</template>
+        <template #default="{ row }">{{ formatDateDisplay(row.endTime) || '永久' }}</template>
       </el-table-column>
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
@@ -179,7 +180,9 @@ onMounted(loadData)
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="createTime" label="创建时间" width="170" />
+      <el-table-column label="创建时间" width="170">
+        <template #default="{ row }">{{ formatDateDisplay(row.createTime) }}</template>
+      </el-table-column>
       <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
           <el-button v-if="row.status === 1" link type="primary" @click="openEdit(row)">编辑</el-button>

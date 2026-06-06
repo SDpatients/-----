@@ -32,7 +32,6 @@ export interface Supplier {
   category: string
   categoryId?: number | string
   supplierType?: number
-  level: string
   status: number
   contact: string
   contactEmail?: string
@@ -43,8 +42,6 @@ export interface Supplier {
   city?: string
   district?: string
   admissionStage: string
-  performanceScore: number
-  riskLevel: string
   accountCount: number
   address: string
   bankName?: string
@@ -82,6 +79,32 @@ export interface PurchaseOrder {
   status: string
   confirmStatus: string
   riskLevel: string
+  /** 订单明细总数量 */
+  totalQty?: number
+  /** 已发货总数量 */
+  shippedQty?: number
+  /** 已收货总数量 */
+  receivedQty?: number
+  /** 在途总数量 */
+  inTransitQty?: number
+  /** 订单明细行列表 */
+  details?: OrderDetailLine[]
+}
+
+/** 采购订单明细行（用于弹窗展示） */
+export interface OrderDetailLine {
+  id: number | string
+  lineNo: number
+  materialCode: string
+  materialName: string
+  materialSpec?: string
+  unit?: string
+  quantity: number
+  unitPrice?: number
+  amount?: number
+  deliveredQty?: number
+  receivedQty?: number
+  deliveryDate?: string
 }
 
 export interface AsnNotice {
@@ -133,6 +156,7 @@ export interface PortalTodo {
   module: string
   businessType: string
   businessId: number | string
+  businessNo: string
   priority: string
   dueDate: string
   createTime: string

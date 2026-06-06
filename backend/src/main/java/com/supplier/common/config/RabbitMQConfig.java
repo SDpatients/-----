@@ -15,30 +15,21 @@ public class RabbitMQConfig {
     // ── 交换机 ──
     public static final String ORDER_EXCHANGE = "supplier.order.exchange";
     public static final String DELIVERY_EXCHANGE = "supplier.delivery.exchange";
-    public static final String QUALITY_EXCHANGE = "supplier.quality.exchange";
-    public static final String SETTLEMENT_EXCHANGE = "supplier.settlement.exchange";
     public static final String NOTICE_EXCHANGE = "supplier.notice.exchange";
-    public static final String INTEGRATION_EXCHANGE = "supplier.integration.exchange";
     public static final String DELAY_EXCHANGE = "supplier.delay.exchange";
     public static final String DEAD_LETTER_EXCHANGE = "supplier.dlx.exchange";
 
     // ── 队列 ──
     public static final String ORDER_QUEUE = "supplier.order.queue";
     public static final String DELIVERY_QUEUE = "supplier.delivery.queue";
-    public static final String QUALITY_QUEUE = "supplier.quality.queue";
-    public static final String SETTLEMENT_QUEUE = "supplier.settlement.queue";
     public static final String NOTICE_QUEUE = "supplier.notice.queue";
-    public static final String INTEGRATION_QUEUE = "supplier.integration.queue";
     public static final String DELAY_QUEUE = "supplier.delay.queue";
     public static final String DEAD_LETTER_QUEUE = "supplier.dlx.queue";
 
     // ── 路由键 ──
     public static final String ORDER_ROUTING_KEY = "supplier.order.routing";
     public static final String DELIVERY_ROUTING_KEY = "supplier.delivery.routing";
-    public static final String QUALITY_ROUTING_KEY = "supplier.quality.routing";
-    public static final String SETTLEMENT_ROUTING_KEY = "supplier.settlement.routing";
     public static final String NOTICE_ROUTING_KEY = "supplier.notice.routing";
-    public static final String INTEGRATION_ROUTING_KEY = "supplier.integration.routing";
     public static final String DELAY_ROUTING_KEY = "supplier.delay.routing";
     public static final String DEAD_LETTER_ROUTING_KEY = "supplier.dlx.routing";
 
@@ -108,50 +99,6 @@ public class RabbitMQConfig {
                 .with(DELIVERY_ROUTING_KEY);
     }
 
-    // ── 质检交换机/队列 ──
-
-    @Bean
-    public DirectExchange qualityExchange() {
-        return new DirectExchange(QUALITY_EXCHANGE, true, false);
-    }
-
-    @Bean
-    public Queue qualityQueue() {
-        return QueueBuilder.durable(QUALITY_QUEUE)
-                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
-                .withArgument("x-dead-letter-routing-key", DEAD_LETTER_ROUTING_KEY)
-                .build();
-    }
-
-    @Bean
-    public Binding qualityBinding() {
-        return BindingBuilder.bind(qualityQueue())
-                .to(qualityExchange())
-                .with(QUALITY_ROUTING_KEY);
-    }
-
-    // ── 对账交换机/队列 ──
-
-    @Bean
-    public DirectExchange settlementExchange() {
-        return new DirectExchange(SETTLEMENT_EXCHANGE, true, false);
-    }
-
-    @Bean
-    public Queue settlementQueue() {
-        return QueueBuilder.durable(SETTLEMENT_QUEUE)
-                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
-                .withArgument("x-dead-letter-routing-key", DEAD_LETTER_ROUTING_KEY)
-                .build();
-    }
-
-    @Bean
-    public Binding settlementBinding() {
-        return BindingBuilder.bind(settlementQueue())
-                .to(settlementExchange())
-                .with(SETTLEMENT_ROUTING_KEY);
-    }
-
     // ── 通知交换机/队列 ──
 
     @Bean
@@ -172,28 +119,6 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(noticeQueue())
                 .to(noticeExchange())
                 .with(NOTICE_ROUTING_KEY);
-    }
-
-    // ── 集成网关交换机/队列 ──
-
-    @Bean
-    public DirectExchange integrationExchange() {
-        return new DirectExchange(INTEGRATION_EXCHANGE, true, false);
-    }
-
-    @Bean
-    public Queue integrationQueue() {
-        return QueueBuilder.durable(INTEGRATION_QUEUE)
-                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
-                .withArgument("x-dead-letter-routing-key", DEAD_LETTER_ROUTING_KEY)
-                .build();
-    }
-
-    @Bean
-    public Binding integrationBinding() {
-        return BindingBuilder.bind(integrationQueue())
-                .to(integrationExchange())
-                .with(INTEGRATION_ROUTING_KEY);
     }
 
     // ── 延迟交换机/队列（用于延迟消费场景） ──

@@ -46,6 +46,12 @@ const resetQuery = () => {
   loadData()
 }
 
+const formatQuantity = (value: number | string | null | undefined): string => {
+  if (value === null || value === undefined || value === '') return '-'
+  const num = Number(value)
+  return Number.isFinite(num) ? num.toLocaleString('zh-CN') : String(value)
+}
+
 const handleShip = async (row: AsnNotice) => {
   try {
     await logisticsApi.ship(row.id)
@@ -121,8 +127,11 @@ onMounted(loadData)
     <el-table v-loading="loading" :data="records" border highlight-current-row>
       <el-table-column prop="asnNo" label="ASN号" width="170" />
       <el-table-column prop="orderNo" label="订单号" width="160" />
-      <el-table-column prop="quantity" label="发货数量" width="110" />
-      <el-table-column prop="warehouse" label="收货仓库" width="140" />
+      <el-table-column prop="quantity" label="发货数量" width="110">
+        <template #default="{ row }">
+          {{ formatQuantity(row.quantity) }}
+        </template>
+      </el-table-column>
       <el-table-column prop="eta" label="预计到货" width="120" />
       <el-table-column label="状态" width="110"><template #default="{ row }"><StatusTag :value="row.status" /></template></el-table-column>
       <el-table-column label="操作" min-width="200">
@@ -131,8 +140,6 @@ onMounted(loadData)
           <el-button v-if="row.rawStatus === 0" link type="success" @click="handleShip(row)">确认发货</el-button>
           <el-button v-if="row.rawStatus === 1" link type="primary" @click="handleArrive(row)">确认送达</el-button>
           <el-button link type="primary" @click="handlePrint(row)">打印</el-button>
-          <el-tag v-if="row.rawStatus === 1" size="small" type="success">已发货</el-tag>
-          <el-tag v-if="row.rawStatus >= 2" size="small">已处理</el-tag>
         </template>
       </el-table-column>
     </el-table>

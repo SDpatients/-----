@@ -3,8 +3,6 @@ package com.supplier.sourcing.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.supplier.common.exception.BusinessException;
 import com.supplier.common.result.ResultCode;
-import com.supplier.settlement.entity.SupplierPerformance;
-import com.supplier.settlement.mapper.SupplierPerformanceMapper;
 import com.supplier.sourcing.entity.Quote;
 import com.supplier.sourcing.entity.QuoteItem;
 import com.supplier.sourcing.entity.Rfq;
@@ -33,7 +31,6 @@ public class QuoteCompareServiceImpl implements QuoteCompareService {
     private final RfqItemMapper rfqItemMapper;
     private final QuoteMapper quoteMapper;
     private final QuoteItemMapper quoteItemMapper;
-    private final SupplierPerformanceMapper supplierPerformanceMapper;
 
     @Override
     public QuoteCompareVO compare(Long rfqId) {
@@ -67,21 +64,6 @@ public class QuoteCompareServiceImpl implements QuoteCompareService {
             quoteItemMap = allQuoteItems.stream().collect(Collectors.groupingBy(QuoteItem::getQuoteId));
         }
 
-        // 供应商绩效
-        Map<Long, BigDecimal> performanceMap = Map.of();
-        if (!quotes.isEmpty()) {
-            List<Long> supplierIds = quotes.stream().map(Quote::getSupplierId).distinct().collect(Collectors.toList());
-            List<SupplierPerformance> performances = supplierPerformanceMapper.selectList(
-                    new LambdaQueryWrapper<SupplierPerformance>()
-                            .in(SupplierPerformance::getSupplierId, supplierIds)
-                            .orderByDesc(SupplierPerformance::getCreateTime)
-            );
-            performanceMap = performances.stream()
-                    .collect(Collectors.toMap(SupplierPerformance::getSupplierId,
-                            p -> p.getTotalScore() != null ? p.getTotalScore() : BigDecimal.ZERO,
-                            (a, b) -> a));
-        }
-
         // 构建比价结果
         QuoteCompareVO result = new QuoteCompareVO();
         result.setRfqId(rfq.getId());
@@ -108,8 +90,6 @@ public class QuoteCompareServiceImpl implements QuoteCompareService {
                 info.setQuoteId(quote.getId());
                 info.setQuoteNo(quote.getQuoteNo());
                 info.setSupplierId(quote.getSupplierId());
-                info.setSupplierPerformanceScore(
-                        performanceMap.getOrDefault(quote.getSupplierId(), BigDecimal.ZERO));
                 if (matched != null) {
                     info.setPrice(matched.getPrice());
                     info.setTaxPrice(matched.getTaxPrice());

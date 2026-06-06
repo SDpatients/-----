@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { orderChangeApi, type OrderChangeItem, type OrderChangeQuery } from '@/api/orderChange'
 import { orderApi } from '@/api/order'
 import { toOrder } from '@/api/adapters'
+import { formatDateDisplay } from '@/lib/utils'
 import { toId } from '@/utils/id'
 import PageContainer from '@/components/common/PageContainer.vue'
 import StatusTag from '@/components/business/StatusTag.vue'
@@ -179,8 +180,12 @@ onMounted(loadChanges)
               </template>
             </el-table-column>
             <el-table-column prop="approveRemark" label="审批意见" min-width="120" show-overflow-tooltip />
-            <el-table-column prop="applyTime" label="申请时间" width="160" />
-            <el-table-column prop="approveTime" label="审批时间" width="160" />
+            <el-table-column label="申请时间" width="160">
+              <template #default="{ row }">{{ formatDateDisplay(row.applyTime) }}</template>
+            </el-table-column>
+            <el-table-column label="审批时间" width="160">
+              <template #default="{ row }">{{ formatDateDisplay(row.approveTime) }}</template>
+            </el-table-column>
             <el-table-column label="操作" width="160" fixed="right">
               <template #default="{ row }">
                 <template v-if="row.approveStatus === 0">
@@ -210,7 +215,7 @@ onMounted(loadChanges)
         </el-form-item>
         <el-form-item v-if="selectedOrder" label="订单信息">
           <el-tag type="info" size="large">
-            {{ selectedOrder.orderNo }} - {{ selectedOrder.supplierName }} | 金额 {{ selectedOrder.amount }} | 交期 {{ selectedOrder.deliveryDate }}
+            {{ selectedOrder.orderNo }} - {{ selectedOrder.supplierName }} | 金额 {{ selectedOrder.amount }} | 交期 {{ formatDateDisplay(selectedOrder.deliveryDate) }}
           </el-tag>
         </el-form-item>
         <el-divider />

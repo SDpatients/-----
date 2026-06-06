@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { DataBoard, Document, Goods, Money, OfficeBuilding, SetUp, Van, Tools, Collection, Box, Connection, ShoppingCart, Notebook, Folder, QuestionFilled } from '@element-plus/icons-vue'
+import { DataBoard, Document, Goods, Money, OfficeBuilding, Van, Tools, Collection, Folder, QuestionFilled, TrendCharts } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import NotificationBell from '@/components/business/NotificationBell.vue'
 import GlobalSearch from '@/components/business/GlobalSearch.vue'
@@ -24,10 +24,7 @@ const menus = [
   { path: '/purchasing/quotes', title: '报价对比', icon: Money },
   { path: '/purchasing/orders', title: '采购订单', icon: Document },
   { path: '/purchasing/asn', title: '物流与交付', icon: Van },
-  { path: '/purchasing/vmi', title: 'VMI预测', icon: Box },
-  { path: '/purchasing/quality', title: '质量协同', icon: SetUp },
-  { path: '/purchasing/settlements', title: '财务结算', icon: Goods },
-  { path: '/purchasing/integration', title: '集成网关', icon: Connection },
+  { path: '/purchasing/financial-reconciliation', title: '财务对账', icon: TrendCharts },
   { path: '/purchasing/settings', title: '系统配置', icon: Tools },
   { path: '/purchasing/faq', title: '常见问题', icon: QuestionFilled },
 ]

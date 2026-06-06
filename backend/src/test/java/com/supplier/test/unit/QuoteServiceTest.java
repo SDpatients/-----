@@ -21,9 +21,14 @@ import com.supplier.sourcing.enums.RfqStatusEnum;
 import com.supplier.sourcing.mapper.QuoteAwardMapper;
 import com.supplier.sourcing.mapper.QuoteItemMapper;
 import com.supplier.sourcing.mapper.QuoteMapper;
+import com.supplier.sourcing.mapper.QuoteNegotiationMapper;
 import com.supplier.sourcing.mapper.RfqItemMapper;
 import com.supplier.sourcing.mapper.RfqMapper;
+import com.supplier.portal.service.PortalTodoService;
+import com.supplier.sourcing.service.ExchangeRateService;
+import com.supplier.sourcing.service.SupplierService;
 import com.supplier.sourcing.service.impl.QuoteServiceImpl;
+import com.supplier.sourcing.vo.SupplierVO;
 import com.supplier.test.BaseUnitTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,6 +71,12 @@ class QuoteServiceTest extends BaseUnitTest {
     private QuoteAwardMapper quoteAwardMapper;
 
     @Mock
+    private QuoteNegotiationMapper quoteNegotiationMapper;
+
+    @Mock
+    private ExchangeRateService exchangeRateService;
+
+    @Mock
     private PurchaseOrderService purchaseOrderService;
 
     @Mock
@@ -73,6 +84,12 @@ class QuoteServiceTest extends BaseUnitTest {
 
     @Mock
     private DomainEventPublisher domainEventPublisher;
+
+    @Mock
+    private PortalTodoService portalTodoService;
+
+    @Mock
+    private SupplierService supplierService;
 
     private Quote submittedQuote;
     private Rfq quotingRfq;
@@ -95,6 +112,12 @@ class QuoteServiceTest extends BaseUnitTest {
         quotingRfq.setRfqNo("RFQ20260601001");
         quotingRfq.setRfqStatus(RfqStatusEnum.QUOTING.getCode());
         quotingRfq.setCurrency("CNY");
+
+        // Mock supplierService.getDetail() 返回供应商信息
+        SupplierVO supplierVO = new SupplierVO();
+        supplierVO.setId(100L);
+        supplierVO.setSupplierName("测试供应商A");
+        when(supplierService.getDetail(anyLong())).thenReturn(supplierVO);
     }
 
     @Nested
